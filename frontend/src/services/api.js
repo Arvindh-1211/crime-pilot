@@ -30,6 +30,16 @@ export const sendMessage = async (sessionId, message) => {
 };
 
 /**
+ * Refine transcribed speech text via LLM
+ * @param {string} text - Raw transcribed speech
+ * @returns {Promise<{refined_text: string}>}
+ */
+export const refineSpeech = async (text) => {
+  const response = await api.post('/chat/refine', { text });
+  return response.data;
+};
+
+/**
  * Submit the completed complaint
  * @param {string} sessionId - Session ID
  * @param {string} phoneNumber - User's phone number

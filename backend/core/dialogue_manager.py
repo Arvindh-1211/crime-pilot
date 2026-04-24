@@ -10,6 +10,7 @@ from .llm_handler import llm_handler
 from .duplicate_checker import duplicate_checker
 from .complaint_builder import complaint_builder
 from .complaint_store import complaint_store
+from routes.complaint import route_to_station
 
 
 class DialogueState(str, Enum):
@@ -450,11 +451,27 @@ class DialogueManager:
         complaint_json = complaint_builder.build_complaint(session, complaint_id)
 
         # Compute severity
+        filled_slots = session.get("filled_slots", {})
         severity_score = complaint_builder.compute_severity(
-            session.get("filled_slots", {}),
+            filled_slots,
             session.get("category_id")
         )
         complaint_json["severity_score"] = severity_score
+        
+        # Add metadata for Officer Dashboard
+        complaint_json["complaint_id"] = complaint_id
+        complaint_json["ncrp_number"] = complaint_id
+        complaint_json["status"] = "pending"
+        complaint_json["fir_number"] = None
+        phone = session.get("phone_number", "unknown")
+        complaint_json["phone_number"] = phone
+        
+        # Location routing
+        user_location = filled_slots.get("location") or filled_slots.get("city") or filled_slots.get("state") or "Unknown"
+        station = route_to_station(user_location)
+        complaint_json["user_location"] = user_location
+        complaint_json["assigned_station"] = station["name"]
+        complaint_json["station_jurisdiction"] = station["jurisdiction"]
 
         # Store in shared complaint store
         complaint_store.save(complaint_id, complaint_json)

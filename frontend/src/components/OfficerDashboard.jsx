@@ -321,8 +321,8 @@ function OfficerDashboard({ officer, onLogout }) {
             </svg>
           </div>
           <div>
-            <h1 className="dash-title">Cyber Crime Command Centre</h1>
-            <p className="dash-subtitle">Officer Dashboard — NCRP Complaint Tracking</p>
+            <h1 className="dash-title">CrimePilot Command Centre</h1>
+            <p className="dash-subtitle">Officer Dashboard — Cybercrime Management</p>
           </div>
         </div>
 

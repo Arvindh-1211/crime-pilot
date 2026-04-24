@@ -640,6 +640,26 @@ If nothing meets strict criteria, return {{}}"""
             "email": "cybercrime.gov.in",
         }
 
+    def refine_speech(self, raw_text: str) -> str:
+        """Refines raw speech-to-text transcript into clear, grammatically correct text without changing meaning."""
+        if not self._initialized or not raw_text.strip():
+            return raw_text
+
+        prompt = f"""You are an assistant helping a victim refine their voice-transcribed cybercrime report.
+Raw transcript: "{raw_text}"
+
+Task: Correct grammar, fix speech-to-text errors (like homophones), and make the sentence clear and concise. 
+DO NOT change the core meaning, add new facts, or change the tone significantly.
+Return ONLY the refined text. No introductory words, no quotes."""
+
+        try:
+            model = self._make_model("You are a text refinement assistant. Return only refined text.")
+            response = model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            logger.warning(f"Speech refinement failed: {e}")
+            return raw_text
+
 
 # Global LLM handler instance
 llm_handler = LLMHandler()

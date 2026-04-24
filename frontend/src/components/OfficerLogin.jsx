@@ -30,14 +30,8 @@ function OfficerLogin({ onLoginSuccess }) {
 
   return (
     <div className="officer-login-page">
-      {/* Animated background particles */}
-      <div className="login-bg-particles">
-        <div className="particle particle-1"></div>
-        <div className="particle particle-2"></div>
-        <div className="particle particle-3"></div>
-        <div className="particle particle-4"></div>
-        <div className="particle particle-5"></div>
-      </div>
+      {/* Pattern background */}
+      <div className="login-bg-particles"></div>
 
       <div className="login-card">
         {/* Badge / Shield Icon */}
@@ -48,8 +42,8 @@ function OfficerLogin({ onLoginSuccess }) {
           </svg>
         </div>
 
-        <h1 className="login-title">Cyber Crime Officer Portal</h1>
-        <p className="login-subtitle">National Cybercrime Reporting Portal – Secure Access</p>
+        <h1 className="login-title">CrimePilot Officer Portal</h1>
+        <p className="login-subtitle">NCRP Cybercrime Management System – Secure Access</p>
 
         <form onSubmit={handleSubmit} className="login-form" id="officer-login-form">
           {error && (

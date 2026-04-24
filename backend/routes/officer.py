@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Body, Depends
 from typing import Dict, Any
 
-from .complaint import stored_complaints
+from core.complaint_store import complaint_store
 
 router = APIRouter()
 
@@ -54,7 +54,7 @@ async def officer_login(request: Dict[str, str] = Body(...)):
 @router.get("/officer/complaints")
 async def get_all_complaints():
     """Return every complaint with its tracking metadata."""
-    complaints = list(stored_complaints.values())
+    complaints = complaint_store.list_all()
     # Sort by date_filed descending (newest first)
     complaints.sort(key=lambda c: c.get("date_filed", ""), reverse=True)
 
@@ -80,9 +80,10 @@ async def get_all_complaints():
 @router.get("/officer/complaints/{complaint_id}")
 async def get_complaint_detail(complaint_id: str):
     """Get full detail of a single complaint."""
-    if complaint_id not in stored_complaints:
+    complaint = complaint_store.get(complaint_id)
+    if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
-    return stored_complaints[complaint_id]
+    return complaint
 
 
 @router.put("/officer/complaints/{complaint_id}/status")
@@ -102,15 +103,17 @@ async def update_complaint_status(
             detail=f"Invalid status. Must be one of: {', '.join(allowed)}",
         )
 
-    if complaint_id not in stored_complaints:
+    complaint = complaint_store.get(complaint_id)
+    if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    stored_complaints[complaint_id]["status"] = status
-    stored_complaints[complaint_id]["status_updated_at"] = datetime.now().isoformat()
+    complaint["status"] = status
+    complaint["status_updated_at"] = datetime.now().isoformat()
+    complaint_store.save(complaint_id, complaint)
 
     return {
         "message": f"Complaint {complaint_id} marked as {status}",
-        "complaint": stored_complaints[complaint_id],
+        "complaint": complaint,
     }
 
 
@@ -127,20 +130,23 @@ async def assign_fir_number(
     if not fir_number:
         raise HTTPException(status_code=400, detail="FIR number is required")
 
-    if complaint_id not in stored_complaints:
+    complaint = complaint_store.get(complaint_id)
+    if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    stored_complaints[complaint_id]["fir_number"] = fir_number
-    stored_complaints[complaint_id]["fir_assigned_at"] = datetime.now().isoformat()
+    complaint["fir_number"] = fir_number
+    complaint["fir_assigned_at"] = datetime.now().isoformat()
 
     # Auto-accept if still pending
-    if stored_complaints[complaint_id].get("status") == "pending":
-        stored_complaints[complaint_id]["status"] = "accepted"
-        stored_complaints[complaint_id]["status_updated_at"] = datetime.now().isoformat()
+    if complaint.get("status") == "pending":
+        complaint["status"] = "accepted"
+        complaint["status_updated_at"] = datetime.now().isoformat()
+
+    complaint_store.save(complaint_id, complaint)
 
     return {
         "message": f"FIR {fir_number} assigned to complaint {complaint_id}",
-        "complaint": stored_complaints[complaint_id],
+        "complaint": complaint,
     }
 
 
@@ -157,14 +163,16 @@ async def transfer_complaint(
     if not target_station:
         raise HTTPException(status_code=400, detail="Target station is required")
 
-    if complaint_id not in stored_complaints:
+    complaint = complaint_store.get(complaint_id)
+    if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    stored_complaints[complaint_id]["status"] = "transferred"
-    stored_complaints[complaint_id]["assigned_station"] = target_station
-    stored_complaints[complaint_id]["transferred_at"] = datetime.now().isoformat()
+    complaint["status"] = "transferred"
+    complaint["assigned_station"] = target_station
+    complaint["transferred_at"] = datetime.now().isoformat()
+    complaint_store.save(complaint_id, complaint)
 
     return {
         "message": f"Complaint {complaint_id} transferred to {target_station}",
-        "complaint": stored_complaints[complaint_id],
+        "complaint": complaint,
     }
