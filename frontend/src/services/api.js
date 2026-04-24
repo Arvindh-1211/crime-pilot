@@ -78,5 +78,66 @@ export const listComplaints = async () => {
   return response.data;
 };
 
+// ── Officer Dashboard API ────────────────────────────────────────────────────
+
+/**
+ * Authenticate an officer
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{token: string, role: string, name: string, badge: string, station: string}>}
+ */
+export const officerLogin = async (username, password) => {
+  const response = await api.post('/officer/login', { username, password });
+  return response.data;
+};
+
+/**
+ * Fetch all complaints with tracking metrics (officer dashboard)
+ * @returns {Promise<{complaints: Array, metrics: Object}>}
+ */
+export const officerGetComplaints = async () => {
+  const response = await api.get('/officer/complaints');
+  return response.data;
+};
+
+/**
+ * Get single complaint detail
+ * @param {string} complaintId
+ */
+export const officerGetComplaintDetail = async (complaintId) => {
+  const response = await api.get(`/officer/complaints/${complaintId}`);
+  return response.data;
+};
+
+/**
+ * Update complaint status (accepted / rejected / transferred)
+ * @param {string} complaintId
+ * @param {string} status
+ */
+export const officerUpdateStatus = async (complaintId, status) => {
+  const response = await api.put(`/officer/complaints/${complaintId}/status`, { status });
+  return response.data;
+};
+
+/**
+ * Assign an FIR number to a complaint
+ * @param {string} complaintId
+ * @param {string} firNumber
+ */
+export const officerAssignFir = async (complaintId, firNumber) => {
+  const response = await api.put(`/officer/complaints/${complaintId}/fir`, { fir_number: firNumber });
+  return response.data;
+};
+
+/**
+ * Transfer complaint to another station
+ * @param {string} complaintId
+ * @param {string} targetStation
+ */
+export const officerTransferComplaint = async (complaintId, targetStation) => {
+  const response = await api.put(`/officer/complaints/${complaintId}/transfer`, { target_station: targetStation });
+  return response.data;
+};
+
 // Export axios instance for custom requests
 export { api };

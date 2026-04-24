@@ -11,12 +11,12 @@ function Header() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-wide">National Cybercrime Reporting Portal</h1>
+              <h1 className="text-xl font-bold tracking-wide">CrimePilot</h1>
               <p className="text-sm text-blue-200">Intelligent Complaint Filing Assistant</p>
             </div>
           </div>
 
-          {/* Right side - Status/Info */}
+          {/* Right side - Status/Info + Officer Portal */}
           <div className="hidden md:flex items-center space-x-4 text-sm">
             <div className="flex items-center text-blue-200">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,13 +30,28 @@ function Header() {
               </svg>
               <span>Real-time Support</span>
             </div>
+
+            {/* Officer Portal Button */}
+            <a
+              href="/officer"
+              id="officer-portal-link"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors duration-200 border border-indigo-400"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+              Officer Portal
+            </a>
           </div>
         </div>
 
         {/* Mobile Status Bar */}
-        <div className="md:hidden mt-3 text-xs text-blue-200 flex justify-between">
-          <span>Available 24/7</span>
-          <span>Real-time Support</span>
+        <div className="md:hidden mt-3 text-xs text-blue-200 flex justify-between items-center">
+          <span>Available 24/7 · Real-time Support</span>
+          <a href="/officer" className="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-semibold">
+            Officer Portal
+          </a>
         </div>
       </div>
     </header>
