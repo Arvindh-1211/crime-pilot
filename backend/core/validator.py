@@ -44,7 +44,8 @@ class Validator:
             "phone": self._validate_phone,
             "url": self._validate_url,
             "text": self._validate_text,
-            "boolean": self._validate_boolean
+            "boolean": self._validate_boolean,
+            "email": self._validate_email,
         }
 
         validator_fn = validators.get(slot_type, self._validate_text)
@@ -131,31 +132,38 @@ class Validator:
         return {"valid": False, "cleaned_value": None, "error": "Invalid UPI ID format. Example: name@bank"}
 
     def _validate_phone(self, value: str, slot_name: str) -> Dict[str, Any]:
-        """Validate Indian phone number format."""
-        # Remove common prefixes and spaces
+        """Validate Indian phone number or contact identifier.
+        
+        Accepts: 10-digit mobiles, +91 prefixed, Telegram @usernames,
+        email addresses, and free-text contact descriptions.
+        """
+        # Remove common prefixes and spaces for digit-only check
         cleaned = re.sub(r'[+\s\-]', '', value)
 
-        # Check if it's an Indian mobile number
-        # Should be 10 digits starting with 6-9, or 11 digits starting with 91
-        if len(cleaned) == 10 and cleaned[0] in '6789':
+        # Strict 10-digit Indian mobile
+        if len(cleaned) == 10 and cleaned[0] in '6789' and cleaned.isdigit():
             return {"valid": True, "cleaned_value": cleaned, "error": None}
 
-        if len(cleaned) == 11 and cleaned.startswith('91'):
-            return {"valid": True, "cleaned_value": cleaned, "error": None}
+        if len(cleaned) == 12 and cleaned.startswith('91') and cleaned.isdigit():
+            return {"valid": True, "cleaned_value": cleaned[2:], "error": None}
 
-        if len(cleaned) == 12 and cleaned.startswith('0'):
-            # Remove leading 0 for STD code
-            return {"valid": True, "cleaned_value": cleaned[1:], "error": None}
+        # Accept Telegram @username, email, or descriptive contact
+        if value.startswith('@') or '@' in value or len(value) >= 4:
+            return {"valid": True, "cleaned_value": value.strip(), "error": None}
 
-        return {"valid": False, "cleaned_value": None, "error": "Invalid phone number. Please enter 10-digit Indian mobile (6-9开头)"}
+        return {"valid": False, "cleaned_value": None, "error": "Please provide a valid phone number, username, or contact ID"}
 
     def _validate_url(self, value: str, slot_name: str) -> Dict[str, Any]:
-        """Validate URL format."""
-        # URL must start with http:// or https://
+        """Validate URL format — accept http/https or plain domain names."""
         if re.match(r'^https?://', value, re.IGNORECASE):
             return {"valid": True, "cleaned_value": value, "error": None}
-
-        return {"valid": False, "cleaned_value": None, "error": "URL must start with http:// or https://"}
+        # Accept plain domain-like strings (e.g. fake-sbi.com)
+        if re.match(r'^[\w.-]+\.[a-zA-Z]{2,}', value):
+            return {"valid": True, "cleaned_value": value, "error": None}
+        # Accept "don't remember" style answers
+        if len(value) >= 4:
+            return {"valid": True, "cleaned_value": value, "error": None}
+        return {"valid": False, "cleaned_value": None, "error": "Please provide the website URL or describe it"}
 
     def _validate_text(self, value: str, slot_name: str) -> Dict[str, Any]:
         """Validate general text input."""
@@ -175,6 +183,13 @@ class Validator:
             return {"valid": True, "cleaned_value": "false", "error": None}
 
         return {"valid": False, "cleaned_value": None, "error": "Please answer Yes or No"}
+
+    def _validate_email(self, value: str, slot_name: str) -> Dict[str, Any]:
+        """Validate email address format."""
+        pattern = r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$'
+        if re.match(pattern, value.strip()):
+            return {"valid": True, "cleaned_value": value.strip().lower(), "error": None}
+        return {"valid": False, "cleaned_value": None, "error": "Please enter a valid email address (e.g., name@gmail.com)"}
 
 
 # Global validator instance

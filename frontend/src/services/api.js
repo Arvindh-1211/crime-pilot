@@ -32,13 +32,21 @@ export const sendMessage = async (sessionId, message) => {
 /**
  * Submit the completed complaint
  * @param {string} sessionId - Session ID
- * @param {string} phoneNumber - User's phone number
- * @returns {Promise<{complaint_id: string, complaint_json: Object, severity_score: number}>}
+ * @param {Object} formData - Contact details from the frontend form
+ * @returns {Promise<{complaint_id, complaint_json, severity_score, tracking_url, email_preview}>}
  */
-export const submitComplaint = async (sessionId, phoneNumber) => {
-  const response = await api.post('/complaint/submit', { session_id: sessionId, phone_number: phoneNumber });
+export const submitComplaint = async (sessionId, formData) => {
+  const response = await api.post('/complaint/submit', {
+    session_id: sessionId,
+    phone_number: formData.phone || '',
+    email: formData.email || '',
+    name: formData.name || '',
+    incident_datetime: formData.incident_datetime || '',
+    location: formData.location || ''
+  });
   return response.data;
 };
+
 
 /**
  * Upload evidence file

@@ -13,37 +13,110 @@ class ComplaintBuilder:
     # Base scores for each category
     CATEGORY_BASE_SCORES = {
         "SEXTORTION": 9.0,
+        "IDENTITY_THEFT": 8.5,
         "INVESTMENT_SCAM": 8.0,
+        "OTP_SIM_SWAP": 7.5,
         "VISHING": 7.0,
         "UPI_FRAUD": 6.5,
-        "PHISHING": 6.0
+        "PHISHING": 6.0,
+        "JOB_FRAUD": 6.0,
+        "SOCIAL_MEDIA_FRAUD": 5.5,
+        "ONLINE_SHOPPING_FRAUD": 5.0,
+        "LOTTERY_SCAM": 5.0,
     }
 
-    # Slot labels for display
+    # Slot labels for display (used by officer dashboard)
     SLOT_LABELS = {
+        # Universal
+        "victim_name": "Complainant Name",
+        "victim_phone": "Contact Phone",
+        "victim_email": "Email Address",
         "incident_date": "Incident Date",
-        "amount_lost": "Amount Lost",
+        "incident_time": "Incident Time",
+        "incident_location": "City / State",
+        # UPI
+        "amount_lost": "Amount Lost (₹)",
         "upi_transaction_id": "UPI Transaction ID",
         "suspect_upi_id": "Suspect UPI ID",
-        "platform": "Platform",
-        "caller_number": "Caller Number",
-        "bank_name": "Bank Name",
+        "platform": "UPI App Used",
+        "utr_number": "UTR Number",
+        "bank_name_victim": "Your Bank",
+        "account_number_victim": "Your Account Number",
+        "screenshot": "Screenshot Available",
+        # Vishing
+        "caller_number": "Caller Phone Number",
+        "caller_claimed_to_be": "Caller Claimed To Be",
+        "otp_shared": "OTP / PIN Shared",
         "call_recording": "Call Recording Available",
-        "otp_shared": "OTP Shared",
+        "bank_name": "Bank Claimed",
+        "remote_app_installed": "Remote App Installed",
+        # Phishing
         "phishing_url": "Phishing URL",
         "data_compromised": "Data Compromised",
-        "email_screenshot": "Email Screenshot Available",
-        "bank_involved": "Bank Involved",
-        "amount_invested": "Amount Invested",
-        "platform_name": "Platform Name",
+        "email_screenshot": "Email/Message Screenshot",
+        "bank_involved": "Bank Targeted",
+        "account_compromised": "Account Accessed",
+        # Investment
+        "amount_invested": "Amount Invested (₹)",
+        "platform_name": "Investment Platform",
         "recruiter_contact": "Recruiter Contact",
+        "payment_mode": "Payment Mode",
         "payment_proof": "Payment Proof Available",
-        "platform_used": "Platform Used",
-        "suspect_contact": "Suspect Contact",
-        "screenshot_available": "Screenshot Available",
-        "amount_demanded": "Amount Demanded",
-        "utr_number": "UTR Number",
-        "screenshot": "Screenshot Available"
+        "withdrawal_blocked": "Withdrawal Blocked",
+        # Sextortion
+        "platform_used": "Platform Used by Suspect",
+        "suspect_contact": "Suspect Contact / ID",
+        "amount_paid": "Amount Already Paid (₹)",
+        "blackmail_method": "Blackmail Method",
+        "screenshot_available": "Screenshots Available",
+        "amount_demanded": "Amount Demanded (₹)",
+        "content_recorded": "Content Was Recorded",
+        # Job Fraud
+        "job_platform": "Job/Task Platform",
+        "task_description": "Tasks Assigned",
+        "deposit_paid": "Deposit / Fee Paid (₹)",
+        "recruiter_contact_job": "Recruiter / HR Contact",
+        "job_offer_screenshot": "Job Offer Screenshot",
+        "app_used_for_tasks": "Task App Used",
+        "website_url": "Scam Website URL",
+        # SIM Swap
+        "sim_stopped_working": "SIM Stopped Working",
+        "service_hijacked": "Service Hijacked",
+        "amount_lost_sim": "Amount Lost (₹)",
+        "bank_name_sim": "Bank Account Drained",
+        "transaction_sms": "Transaction SMS Available",
+        "telecom_operator": "Telecom Operator",
+        # Social Media / Romance
+        "social_platform": "Social Platform",
+        "fake_profile_id": "Fake Profile ID / Name",
+        "romance_money_sent": "Money Sent to Suspect (₹)",
+        "how_long_known": "Duration of Contact",
+        "profile_screenshot": "Profile Screenshot",
+        "chat_screenshot": "Chat Screenshot",
+        "amount_total_sent": "Total Amount Sent (₹)",
+        # Lottery
+        "lottery_prize_claimed": "Prize Claimed",
+        "processing_fee_paid": "Processing Fee Paid (₹)",
+        "contact_channel": "Contact Channel",
+        "sender_contact": "Sender Contact",
+        "lottery_message_screenshot": "Lottery Message Screenshot",
+        "bank_used_for_payment": "Bank Used for Fee Payment",
+        # Shopping
+        "shopping_website": "Shopping Website / Platform",
+        "order_id": "Order ID",
+        "product_not_received": "Product Ordered",
+        "amount_paid_shopping": "Amount Paid (₹)",
+        "order_screenshot": "Order Screenshot",
+        "seller_contact": "Seller Contact",
+        "delivery_status": "Delivery Status",
+        # Identity Theft
+        "identity_misused": "Type of Identity Misuse",
+        "how_discovered": "How Discovered",
+        "loan_amount": "Fraudulent Loan Amount (₹)",
+        "financial_institution": "Financial Institution",
+        "aadhaar_misused": "Aadhaar Misused",
+        "pan_misused": "PAN Misused",
+        "credit_score_affected": "Credit Score Affected",
     }
 
     def __init__(self):
@@ -69,60 +142,68 @@ class ComplaintBuilder:
             self._categories = {}
 
     def build_complaint(self, session_data: Dict[str, Any], complaint_id: str) -> Dict[str, Any]:
-        """Build the complete complaint JSON structure.
-
-        Args:
-            session_data: Session data including filled_slots, category_id, etc.
-            complaint_id: Generated complaint ID
-
-        Returns:
-            Complete complaint JSON dictionary
-        """
+        """Build the complete complaint JSON structure."""
         self._load_categories()
 
-        # Extract session data
         filled_slots = session_data.get("filled_slots", {})
         category_id = session_data.get("category_id")
         raw_description = session_data.get("raw_description", "")
 
-        # Build complaint structure
+        # Extract universal contact fields
+        victim_name = filled_slots.get("victim_name", "")
+        victim_phone = filled_slots.get("victim_phone", "")
+        victim_email = filled_slots.get("victim_email", "")
+        incident_location = filled_slots.get("incident_location", "")
+
         complaint = {
             "complaint_id": complaint_id,
+            "ncrp_number": complaint_id,
             "complaint_category": category_id,
             "complaint_category_label": self._get_category_label(category_id),
             "date_filed": datetime.now().isoformat(),
             "status": "pending",
+            "victim_name": victim_name,
+            "victim_phone": victim_phone,
+            "victim_email": victim_email,
+            "user_location": incident_location,
             "fields": {},
             "meta": {
                 "source": "chat_assistant",
-                "assistant_version": "1.0.0"
+                "assistant_version": "2.0.0"
             }
         }
 
-        # Add category-specific fields
+        # Add all filled slots to fields
+        universal = {"victim_name", "victim_phone", "victim_email",
+                     "incident_date", "incident_time", "incident_location"}
         if category_id and category_id in self._categories:
             category = self._categories[category_id]
             mandatory = category.get("mandatory_slots", [])
             optional = category.get("optional_slots", [])
+            all_slots = list(universal) + mandatory + optional
+        else:
+            all_slots = list(universal) + list(filled_slots.keys())
+            mandatory = []
 
-            # Add all filled slots to fields
-            for slot in mandatory + optional:
-                if slot in filled_slots and filled_slots[slot] is not None:
-                    complaint["fields"][slot] = {
-                        "value": filled_slots[slot],
-                        "label": self.SLOT_LABELS.get(slot, slot),
-                        "is_optional": slot not in mandatory
-                    }
+        for slot in all_slots:
+            if slot in filled_slots and filled_slots[slot] is not None:
+                complaint["fields"][slot] = {
+                    "value": filled_slots[slot],
+                    "label": self.SLOT_LABELS.get(slot, slot.replace("_", " ").title()),
+                    "is_optional": slot not in mandatory and slot not in universal,
+                }
 
-        # Add raw description
         if raw_description:
             complaint["raw_description"] = raw_description
 
-        # Add optional evidence
         complaint["optional_evidence"] = {
-            "has_screenshot": filled_slots.get("screenshot") == "true" or filled_slots.get("email_screenshot") == "true" or filled_slots.get("screenshot_available") == "true",
+            "has_screenshot": any(
+                filled_slots.get(s) == "true"
+                for s in ["screenshot", "email_screenshot", "screenshot_available",
+                           "job_offer_screenshot", "order_screenshot", "lottery_message_screenshot"]
+            ),
             "has_call_recording": filled_slots.get("call_recording") == "true",
-            "has_payment_proof": filled_slots.get("payment_proof") == "true"
+            "has_payment_proof": filled_slots.get("payment_proof") == "true",
         }
 
         return complaint

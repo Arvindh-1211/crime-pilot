@@ -77,14 +77,26 @@ async def process_message(request: Dict[str, Any] = Body(...)):
     try:
         result = dialogue_manager.process_message(session_id, message)
 
+        # ── KEY FIX: sync the dialogue manager's rich session state back into
+        # session_store so that /complaint/submit can read filled_slots etc.
+        dm_session = dialogue_manager._sessions.get(session_id, {})
+        session_store.update_session(session_id, {
+            "filled_slots":   dm_session.get("filled_slots", {}),
+            "category_id":    dm_session.get("category_id"),
+            "raw_description":dm_session.get("raw_description"),
+            "state":          dm_session.get("state"),
+        })
+
         return {
-            "bot_response": result["bot_response"],
-            "state": result["state"],
-            "progress": result["progress"],
-            "category_id": result["category_id"],
-            "filled_slots": result["filled_slots"],
-            "is_complete": result["is_complete"],
-            "complaint_id": result.get("complaint_id"),
+            "bot_response":  result["bot_response"],
+            "state":         result["state"],
+            "progress":      result["progress"],
+            "category_id":   result["category_id"],
+            "filled_slots":  result["filled_slots"],
+            "is_complete":   result["is_complete"],
+            "complaint_id":  result.get("complaint_id"),
+            "email_preview": result.get("email_preview"),
+            "tracking_url":  result.get("tracking_url"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")

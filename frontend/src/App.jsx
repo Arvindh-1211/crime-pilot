@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import ChatWindow from './components/ChatWindow';
-import SlotProgress from './components/SlotProgress';
 import EvidenceUpload from './components/EvidenceUpload';
 import ComplaintSummary from './components/ComplaintSummary';
+import ContactForm from './components/ContactForm';
 import { startSession, sendMessage, submitComplaint, uploadEvidence } from './services/api';
 import './styles/index.css';
 
@@ -15,21 +15,30 @@ function App() {
   const [filledSlots, setFilledSlots] = useState({});
   const [isComplete, setIsComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [phoneNumbers, setPhoneNumbers] = useState([]);
+  const [submissionResult, setSubmissionResult] = useState(null);
+  
+  // State for the Contact Form on the right panel
+  const [contactFormData, setContactFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    incident_datetime: '',
+    location: ''
+  });
 
   // Initialize session on mount
   useEffect(() => {
     const initSession = async () => {
       try {
-        // Use a mock phone number for demo purposes
         const mockPhone = "9876543210";
         const response = await startSession(mockPhone);
         setSessionId(response.session_id);
         setMessages([{ role: 'assistant', content: response.welcome_message }]);
       } catch (err) {
         setError("Failed to initialize session. Please refresh the page.");
-        setMessages([{ role: 'assistant', content: "Hello! I'm your NCRP Cybercrime Assistant. Let's get started. What type of cybercrime did you experience?" }]);
+        setMessages([{ role: 'assistant', content: "Hello! I'm your NCRP Cybercrime Assistant. Please describe what happened to you." }]);
       }
     };
     initSession();
@@ -42,65 +51,111 @@ function App() {
     setIsLoading(true);
     setError(null);
 
-    // Add user message to chat
     const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
 
     try {
       const response = await sendMessage(sessionId, text);
 
-      // Update state from response
       setCategoryId(response.category_id || null);
       setFilledSlots(response.filled_slots || {});
       setProgress(response.progress || { filled_count: 0, total_count: 0, percentage: 0, checklist: [] });
 
-      // Add bot message to chat
       const botMessage = { role: 'assistant', content: response.bot_response };
       setMessages(prev => [...prev, botMessage]);
 
       if (response.is_complete) {
         setIsComplete(true);
       }
+
+      // If the bot auto-submitted (user said Yes in chat), capture the result
+      if (response.complaint_id && response.email_preview) {
+        const result = {
+          complaint_id:    response.complaint_id,
+          tracking_url:    response.tracking_url || `/track/${response.complaint_id}`,
+          email_preview:   response.email_preview,
+          severity_score:  null,
+          assigned_station: null,
+        };
+        setSubmissionResult(result);
+        // Also persist to localStorage
+        const complaintData = {
+          complaint_id:  response.complaint_id,
+          tracking_url:  result.tracking_url,
+          email_preview: result.email_preview,
+          filled_slots:  response.filled_slots || {},
+          saved_at:      new Date().toISOString(),
+        };
+        localStorage.setItem(`complaint_${response.complaint_id}`, JSON.stringify(complaintData));
+        const existingIds = JSON.parse(localStorage.getItem('ncrp_complaint_ids') || '[]');
+        existingIds.unshift(response.complaint_id);
+        localStorage.setItem('ncrp_complaint_ids', JSON.stringify(existingIds));
+      }
     } catch (err) {
       setError("Failed to send message. Please try again.");
-      setMessages(prev => [...prev, { role: 'assistant', content: "I encountered an error processing your message. Could you please rephrase?" }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "I encountered an error. Could you please try again?" }]);
     } finally {
       setIsLoading(false);
     }
   }, [sessionId]);
 
-  // Handle submitting complaint
+  // Handle submitting complaint — calls API, stores in localStorage, shows result
   const handleSubmitComplaint = useCallback(async () => {
-    if (!sessionId || !phoneNumbers[0]) return;
+    if (!sessionId) return;
+
+    if (!contactFormData.name || !contactFormData.phone) {
+      setError("Please fill out your Name and Phone Number in the Complainant Details form before submitting.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
 
     try {
-      const response = await submitComplaint(sessionId, phoneNumbers[0]);
+      const response = await submitComplaint(sessionId, contactFormData);
 
-      // Store complaint details
-      console.log("Complaint submitted:", response);
+      // Save to localStorage to simulate a database
+      const complaintData = {
+        ...response.complaint_json,
+        complaint_id: response.complaint_id,
+        severity_score: response.severity_score,
+        tracking_url: response.tracking_url,
+        email_preview: response.email_preview,
+        saved_at: new Date().toISOString(),
+      };
+      localStorage.setItem(`complaint_${response.complaint_id}`, JSON.stringify(complaintData));
 
-      // Update chat with confirmation
+      // Also keep a list of all complaint IDs
+      const existingIds = JSON.parse(localStorage.getItem('ncrp_complaint_ids') || '[]');
+      existingIds.unshift(response.complaint_id);
+      localStorage.setItem('ncrp_complaint_ids', JSON.stringify(existingIds));
+
+      setSubmissionResult({
+        complaint_id: response.complaint_id,
+        tracking_url: response.tracking_url || `/track/${response.complaint_id}`,
+        email_preview: response.email_preview,
+        severity_score: response.severity_score,
+        assigned_station: response.assigned_station,
+      });
+
+      // Add success message to chat
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Thank you! Your complaint has been successfully submitted with ID: ${response.complaint_id}`
+        content: `✅ Your complaint has been registered with ID: **${response.complaint_id}**. Check the panel on the right for your tracking link and email acknowledgement.`
       }]);
     } catch (err) {
+      console.error('Submit error:', err);
       setError("Failed to submit complaint. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [sessionId, phoneNumbers]);
+  }, [sessionId, contactFormData]);
 
   // Handle evidence upload
   const handleEvidenceUpload = useCallback(async (file) => {
     if (!sessionId || !file) return;
-
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('session_id', sessionId);
-
-      const response = await uploadEvidence(sessionId, file);
-
-      // Add upload confirmation to chat
+      await uploadEvidence(sessionId, file);
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `Thank you! I've received your evidence file: ${file.name}`
@@ -110,26 +165,36 @@ function App() {
     }
   }, [sessionId]);
 
-  // Get category badge color based on category ID
   const getCategoryColor = (catId) => {
     const colors = {
       'UPI_FRAUD': 'bg-red-100 text-red-800',
       'VISHING': 'bg-orange-100 text-orange-800',
       'PHISHING': 'bg-yellow-100 text-yellow-800',
       'INVESTMENT_SCAM': 'bg-purple-100 text-purple-800',
-      'SEXTORTION': 'bg-red-900 text-red-100'
+      'SEXTORTION': 'bg-red-900 text-red-100',
+      'JOB_FRAUD': 'bg-yellow-100 text-yellow-900',
+      'OTP_SIM_SWAP': 'bg-blue-100 text-blue-800',
+      'SOCIAL_MEDIA_FRAUD': 'bg-pink-100 text-pink-800',
+      'LOTTERY_SCAM': 'bg-green-100 text-green-800',
+      'ONLINE_SHOPPING_FRAUD': 'bg-indigo-100 text-indigo-800',
+      'IDENTITY_THEFT': 'bg-gray-200 text-gray-900',
     };
     return colors[catId] || 'bg-gray-100 text-gray-800';
   };
 
-  // Get category label
   const getCategoryLabel = (catId) => {
     const labels = {
-      'UPI_FRAUD': 'UPI Fraud',
-      'VISHING': 'Vishing',
+      'UPI_FRAUD': 'UPI / Bank Fraud',
+      'VISHING': 'Vishing (Fake Call)',
       'PHISHING': 'Phishing',
       'INVESTMENT_SCAM': 'Investment Scam',
-      'SEXTORTION': 'Sextortion'
+      'SEXTORTION': 'Sextortion',
+      'JOB_FRAUD': 'Job / Task Fraud',
+      'OTP_SIM_SWAP': 'OTP / SIM Swap',
+      'SOCIAL_MEDIA_FRAUD': 'Social Media / Romance Scam',
+      'LOTTERY_SCAM': 'Lottery / Prize Scam',
+      'ONLINE_SHOPPING_FRAUD': 'Online Shopping Fraud',
+      'IDENTITY_THEFT': 'Identity Theft',
     };
     return labels[catId] || catId;
   };
@@ -146,7 +211,7 @@ function App() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Chat Window (2/3 width on desktop) */}
+          {/* Chat Window */}
           <div className="lg:col-span-2 h-[600px] flex flex-col">
             <ChatWindow
               messages={messages}
@@ -155,80 +220,42 @@ function App() {
             />
           </div>
 
-          {/* Side Panel (1/3 width on desktop) */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Slot Progress Card */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Complaint Details</h3>
-
-              {/* Category Badge */}
-              {categoryId && (
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-4 ${getCategoryColor(categoryId)}`}>
-                  {getCategoryLabel(categoryId)}
-                  {progress.percentage > 0 && (
-                    <span className="ml-2 text-gray-500 text-xs">
-                      ({progress.filled_count}/{progress.total_count} filled)
-                    </span>
-                  )}
+          {/* Side Panel */}
+          <div className="lg:col-span-1 space-y-4 overflow-y-auto max-h-[600px] pr-2">
+            
+            {/* Category Indicator */}
+            {categoryId && (
+              <div className={`w-full px-4 py-3 rounded-lg flex items-center justify-between border ${getCategoryColor(categoryId).replace('bg-', 'border-').replace('100', '200')} ${getCategoryColor(categoryId)}`}>
+                <div>
+                  <p className="text-xs uppercase tracking-wider opacity-70 font-bold mb-0.5">Detected Category</p>
+                  <p className="text-sm font-semibold">{getCategoryLabel(categoryId)}</p>
                 </div>
-              )}
-
-              {/* Progress Bar */}
-              {progress.total_count > 0 && (
-                <div className="mb-4">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Progress</span>
-                    <span className="text-gray-800 font-medium">{progress.percentage}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${progress.percentage}%` }}
-                    />
-                  </div>
+                <div className="text-2xl opacity-80">
+                  {categoryId === 'UPI_FRAUD' ? '💸' : categoryId === 'PHISHING' ? '🎣' : '🚨'}
                 </div>
-              )}
-
-              {/* Slot Checklist */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-600">Fill these details:</h4>
-                {progress.checklist && progress.checklist.map((slot, idx) => (
-                  <div key={idx} className={`flex items-start ${slot.filled ? 'opacity-60' : ''}`}>
-                    {slot.filled ? (
-                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-gray-300 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                    <span className="text-sm text-gray-700">{slot.label}</span>
-                  </div>
-                ))}
               </div>
+            )}
 
-              {/* Hidden phone number for submission */}
-              <input
-                type="text"
-                value={phoneNumbers[0] || "9876543210"}
-                onChange={(e) => setPhoneNumbers([e.target.value])}
-                className="hidden"
-              />
-            </div>
+            {/* Contact Form */}
+            <ContactForm 
+              formData={contactFormData} 
+              setFormData={setContactFormData} 
+              isComplete={isComplete || !!submissionResult} 
+            />
 
-            {/* Evidence Upload Card */}
-            {!isComplete && (
+            {/* Evidence Upload */}
+            {!isComplete && !submissionResult && (
               <EvidenceUpload onUpload={handleEvidenceUpload} />
             )}
 
-            {/* Complaint Summary Card */}
+            {/* Complaint Summary + Submit */}
             {isComplete && (
               <ComplaintSummary
-                filledSlots={filledSlots}
+                filledSlots={{...contactFormData, ...filledSlots}}
                 categoryId={categoryId}
                 onSubmit={handleSubmitComplaint}
+                isSubmitting={isSubmitting}
+                submissionResult={submissionResult}
               />
             )}
           </div>
@@ -236,7 +263,7 @@ function App() {
       </main>
 
       <footer className="py-4 text-center text-gray-500 text-sm">
-        <p>National Cybercrime Reporting Portal - Intelligent Assistant</p>
+        <p>National Cybercrime Reporting Portal — Intelligent Assistant</p>
       </footer>
     </div>
   );

@@ -7,6 +7,7 @@ from utils.session_store import session_store
 from core.complaint_builder import complaint_builder
 from core.duplicate_checker import duplicate_checker
 from core.complaint_store import complaint_store   # shared store
+from utils.email_sender import send_email
 
 router = APIRouter()
 
@@ -138,22 +139,24 @@ _seed_demo_complaints()
 
 @router.post("/complaint/submit")
 async def submit_complaint(request: Dict[str, Any] = Body(...)):
-    """Submit a completed complaint via the REST API (alternative to chat flow).
+    """Submit a completed complaint via the REST API.
 
     Args:
-        request: {session_id: str, phone_number: str}
+        request: {session_id, phone_number, email (optional)}
 
     Returns:
-        {complaint_id: str, complaint_json: dict, severity_score: float}
+        {complaint_id, complaint_json, severity_score, tracking_url, email_preview}
     """
     session_id = request.get("session_id", "")
+    # Contact details are now passed directly from the frontend form
     phone_number = request.get("phone_number", "")
+    email = request.get("email", "")
+    name = request.get("name", "the complainant")
+    incident_datetime = request.get("incident_datetime", "")
+    location = request.get("location", "")
 
     if not session_id:
         raise HTTPException(status_code=400, detail="Session ID is required")
-
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="Phone number is required")
 
     session = session_store.get_session(session_id)
     if not session:
@@ -162,6 +165,13 @@ async def submit_complaint(request: Dict[str, Any] = Body(...)):
     filled_slots = session.get("filled_slots", {})
     category_id = session.get("category_id")
 
+    # Manually inject the form data into filled_slots for the complaint builder
+    filled_slots["victim_name"] = name
+    filled_slots["victim_phone"] = phone_number
+    filled_slots["victim_email"] = email
+    filled_slots["incident_location"] = location
+    filled_slots["incident_datetime"] = incident_datetime
+
     complaint_id = _generate_complaint_id()
     complaint_json = complaint_builder.build_complaint(session, complaint_id)
     severity_score = complaint_builder.compute_severity(filled_slots, category_id)
@@ -169,29 +179,31 @@ async def submit_complaint(request: Dict[str, Any] = Body(...)):
     raw_description = session.get("raw_description", "")
     dup_result = duplicate_checker.check(phone_number, filled_slots, raw_description)
 
+    duplicate_warning = None
     if dup_result["is_duplicate"]:
-        return {
-            "complaint_id": complaint_id,
-            "complaint_json": complaint_json,
-            "severity_score": severity_score,
-            "warning": (
-                f"Potential duplicate of complaint {dup_result['matched_complaint_id']} "
-                f"detected via {dup_result['method']} match"
-            ),
-        }
+        duplicate_warning = (
+            f"Potential duplicate of complaint {dup_result['matched_complaint_id']} "
+            f"detected via {dup_result['method']} match"
+        )
 
     duplicate_checker.register(phone_number, complaint_id, filled_slots, raw_description)
 
-    # Store complaint with tracking metadata
     complaint_json["complaint_id"] = complaint_id
-    complaint_json["ncrp_number"] = complaint_id  # NCRP number is same as complaint_id
+    complaint_json["ncrp_number"] = complaint_id
     complaint_json["severity_score"] = severity_score
-    complaint_json["status"] = "pending"  # pending | accepted | rejected | transferred
+    complaint_json["status"] = "pending"
     complaint_json["fir_number"] = None
     complaint_json["phone_number"] = phone_number
+    complaint_json["victim_name"] = name
+    complaint_json["victim_email"] = email
 
-    # Location routing — assign to nearest cyber crime station
-    user_location = filled_slots.get("location") or filled_slots.get("city") or filled_slots.get("state") or "Unknown"
+    # Location routing
+    user_location = (
+        filled_slots.get("incident_location")
+        or filled_slots.get("location")
+        or filled_slots.get("city")
+        or "Unknown"
+    )
     station = route_to_station(user_location)
     complaint_json["user_location"] = user_location
     complaint_json["assigned_station"] = station["name"]
@@ -199,12 +211,47 @@ async def submit_complaint(request: Dict[str, Any] = Body(...)):
 
     stored_complaints[complaint_id] = complaint_json
 
-    return {
+    from core.complaint_store import complaint_store as shared_store
+    shared_store.save(complaint_id, complaint_json)
+
+    # Generate tracking URL and email preview
+    tracking_url = f"http://localhost:5173/track/{complaint_id}"
+    from datetime import datetime
+    date_filed = datetime.now().strftime("%d %B %Y, %I:%M %p")
+    category_label = complaint_json.get("complaint_category_label", category_id or "Unknown")
+
+    email_preview = {
+        "to": email,
+        "subject": f"NCRP Complaint Registered — {complaint_id}",
+        "body": (
+            f"Dear {name},\n\n"
+            f"Your cybercrime complaint has been successfully registered on the National Cybercrime Reporting Portal.\n\n"
+            f"Complaint ID   : {complaint_id}\n"
+            f"Complaint Type : {category_label}\n"
+            f"Date Filed     : {date_filed}\n"
+            f"Assigned To    : {station['name']}\n\n"
+            f"Track your complaint at:\n{tracking_url}\n\n"
+            f"Please save your Complaint ID — you will need it to follow up.\n"
+            f"National Cybercrime Helpline: 1930\n\n"
+            f"Regards,\nNational Cybercrime Reporting Portal (NCRP)\ncybercrime.gov.in"
+        )
+    }
+
+    # Dispatch real email if provided
+    if email:
+        send_email(email_preview["to"], email_preview["subject"], email_preview["body"])
+
+    result = {
         "complaint_id": complaint_id,
         "complaint_json": complaint_json,
         "severity_score": severity_score,
-        "assigned_station": station["name"]
+        "assigned_station": station["name"],
+        "tracking_url": tracking_url,
+        "email_preview": email_preview,
     }
+    if duplicate_warning:
+        result["warning"] = duplicate_warning
+    return result
 
 
 @router.get("/complaint/{complaint_id}")

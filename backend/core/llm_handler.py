@@ -8,11 +8,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 FRAUD_CATEGORIES = [
-    "UPI_FRAUD – Unauthorized UPI transactions, fake QR codes, UPI ID impersonation",
+    "UPI_FRAUD – Unauthorized UPI transactions, fake QR codes, UPI collect request scams",
     "VISHING – Voice/video call fraud, impersonation of bank/govt officials over phone",
     "PHISHING – Fake websites, emails, or SMS stealing credentials or financial data",
-    "INVESTMENT_SCAM – Fake high-return investment schemes (crypto, forex, stocks)",
-    "SEXTORTION – Blackmail using intimate/explicit video or images",
+    "INVESTMENT_SCAM – Fake high-return investment schemes (crypto, forex, stocks, Telegram groups)",
+    "SEXTORTION – Blackmail using intimate/explicit video or images obtained via fake calls",
+    "JOB_FRAUD – Fake job offers, part-time task fraud, upfront deposit scams",
+    "OTP_SIM_SWAP – SIM stopped working, number ported without consent, OTP hijacked",
+    "SOCIAL_MEDIA_FRAUD – Fake profiles, romance scams, matrimonial fraud on social platforms",
+    "LOTTERY_SCAM – Fake lottery/prize wins requiring processing fee or tax payment",
+    "ONLINE_SHOPPING_FRAUD – Fake e-commerce, non-delivery, counterfeit goods, OLX/Quikr scams",
+    "IDENTITY_THEFT – Aadhaar/PAN misuse, fraudulent loans or accounts opened in victim's name",
 ]
 
 # ---------------------------------------------------------------------------
@@ -56,6 +62,48 @@ SCENARIO_QUESTIONS: Dict[str, List[str]] = {
         "Did they demand money — through UPI, bank transfer, or gift cards — in exchange for deleting the video?",
         "Have you already made any payment to them, even a small one, hoping they would stop?",
     ],
+    "JOB_FRAUD": [
+        "Were you offered a part-time job or task-based work (like liking YouTube videos, rating apps) that promised easy money?",
+        "Were you asked to pay a 'registration fee', 'activation fee', or 'task deposit' before you could start earning?",
+        "Did you receive some small payments initially to build your trust, before you were asked to invest a larger amount?",
+        "Did the recruiter contact you via WhatsApp, Telegram, or a suspicious website?",
+        "Did the platform stop responding or block you after you paid the deposit?",
+    ],
+    "OTP_SIM_SWAP": [
+        "Did your mobile phone suddenly show 'No Service' or 'SIM not valid' even in a good network area?",
+        "Did you receive calls or messages from your telecom operator about a SIM upgrade or port request you did not initiate?",
+        "Did you notice transactions in your bank account or UPI app happening without your knowledge?",
+        "Did someone call you claiming to be from your telecom provider and ask you to press 1 or share any details?",
+        "Were you locked out of your online banking, email, or UPI app around the same time your SIM stopped working?",
+    ],
+    "SOCIAL_MEDIA_FRAUD": [
+        "Did you connect with someone online who seemed very friendly, attractive, or successful very quickly?",
+        "Did this person claim to be from abroad, or say they were a doctor, army officer, or wealthy businessman?",
+        "Did they eventually ask you to send money — for medical emergencies, visa fees, flight tickets, or investments?",
+        "Did they avoid video calls, or when they did appear on camera it seemed pre-recorded or blurry?",
+        "Have you sent money multiple times, each time being told there's one more problem to solve?",
+    ],
+    "LOTTERY_SCAM": [
+        "Did you receive an unexpected SMS, email, or call saying you won a prize, lottery, or lucky draw?",
+        "Were you asked to pay 'GST', 'processing fees', 'customs duty', or 'government tax' to claim your prize?",
+        "Did the message mention a well-known brand name like KBC, Amazon, or a government scheme to seem legitimate?",
+        "Did the sender ask you to keep the prize a secret and not tell your family?",
+        "After you paid the fee, did they ask for more money or stop responding?",
+    ],
+    "ONLINE_SHOPPING_FRAUD": [
+        "Did you purchase a product from a website or seller you found online, and the item was never delivered?",
+        "Was the website offering products at unusually low prices compared to other platforms?",
+        "Did the seller ask you to pay via UPI or bank transfer directly, rather than through the platform's payment system?",
+        "Did the seller stop responding or block you after receiving payment?",
+        "If the product was delivered, was it significantly different from what was shown, or was it counterfeit?",
+    ],
+    "IDENTITY_THEFT": [
+        "Did you recently discover a loan, credit card, or account in your name that you never applied for?",
+        "Did you receive calls from a bank or NBFC about EMI payments for a loan you never took?",
+        "Have you shared a copy of your Aadhaar, PAN, or other ID documents with anyone recently — for KYC, job, or rental purposes?",
+        "Did you notice your CIBIL credit score drop suddenly, or find unknown entries in your credit report?",
+        "Do you suspect your SIM or email was also compromised as part of this fraud?",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -67,6 +115,12 @@ SECONDARY_FRAUD_INDICATORS: Dict[str, List[str]] = {
     "PHISHING": ["link", "website", "clicked", "email", "sms", "credentials", "password"],
     "INVESTMENT_SCAM": ["invest", "profit", "telegram group", "returns", "crypto", "trading"],
     "SEXTORTION": ["video call", "nude", "blackmail", "morphed", "threat", "send to family"],
+    "JOB_FRAUD": ["job", "task", "part time", "youtube like", "deposit", "activation fee"],
+    "OTP_SIM_SWAP": ["sim", "no service", "ported", "otp intercepted", "telecom"],
+    "SOCIAL_MEDIA_FRAUD": ["fake profile", "romance", "matrimonial", "dating", "abroad", "army officer"],
+    "LOTTERY_SCAM": ["lottery", "prize", "lucky draw", "kbc", "processing fee", "you won"],
+    "ONLINE_SHOPPING_FRAUD": ["order", "not delivered", "fake seller", "olx", "shopping", "counterfeit"],
+    "IDENTITY_THEFT": ["aadhaar", "pan", "loan in my name", "credit card", "cibil", "account opened"],
 }
 
 # ---------------------------------------------------------------------------
@@ -284,14 +338,22 @@ Categories:
 
 Complaint: "{description}"
 
-Return ONLY the category ID — one of: UPI_FRAUD, VISHING, PHISHING, INVESTMENT_SCAM, SEXTORTION
+Return ONLY the category ID — one of:
+UPI_FRAUD, VISHING, PHISHING, INVESTMENT_SCAM, SEXTORTION,
+JOB_FRAUD, OTP_SIM_SWAP, SOCIAL_MEDIA_FRAUD, LOTTERY_SCAM,
+ONLINE_SHOPPING_FRAUD, IDENTITY_THEFT
+
 No explanation, no punctuation, just the ID."""
 
         try:
             model = self._make_model("You are a cybercrime classifier. Output only the category ID.")
             response = model.generate_content(prompt)
             result = response.text.strip().upper()
-            known = ["UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION"]
+            known = [
+                "UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION",
+                "JOB_FRAUD", "OTP_SIM_SWAP", "SOCIAL_MEDIA_FRAUD", "LOTTERY_SCAM",
+                "ONLINE_SHOPPING_FRAUD", "IDENTITY_THEFT",
+            ]
             for k in known:
                 if k in result:
                     return k
@@ -316,8 +378,11 @@ No explanation, no punctuation, just the ID."""
             return self._keyword_secondary_detect(description, primary_category)
 
         all_input = description + " " + " ".join(scenario_answers.values())
-        other_categories = [c for c in ["UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION"]
-                            if c != primary_category]
+        other_categories = [c for c in [
+            "UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION",
+            "JOB_FRAUD", "OTP_SIM_SWAP", "SOCIAL_MEDIA_FRAUD", "LOTTERY_SCAM",
+            "ONLINE_SHOPPING_FRAUD", "IDENTITY_THEFT",
+        ] if c != primary_category]
 
         prompt = f"""A cybercrime victim's primary complaint is: {primary_category}
 
@@ -329,8 +394,6 @@ Analyze if this description also contains clear evidence of any of these OTHER f
 
 Rules:
 - Only flag a secondary fraud if there is EXPLICIT evidence in the text, not just possibility
-- Example: Primary is VISHING but they also mention clicking a link and entering credentials = secondary PHISHING
-- Example: Primary is INVESTMENT_SCAM but they also sent money via UPI after being scammed = secondary UPI_FRAUD
 - Return ONLY a JSON array of category IDs that are clearly present, e.g. ["UPI_FRAUD"] or []
 - If none, return []
 
@@ -345,7 +408,11 @@ Return JSON array only."""
                 if text.startswith("json"):
                     text = text[4:]
             result = json.loads(text)
-            valid = ["UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION"]
+            valid = [
+                "UPI_FRAUD", "VISHING", "PHISHING", "INVESTMENT_SCAM", "SEXTORTION",
+                "JOB_FRAUD", "OTP_SIM_SWAP", "SOCIAL_MEDIA_FRAUD", "LOTTERY_SCAM",
+                "ONLINE_SHOPPING_FRAUD", "IDENTITY_THEFT",
+            ]
             return [r for r in result if r in valid and r != primary_category]
         except Exception as e:
             logger.warning(f"Secondary fraud detection failed: {e}")
@@ -452,7 +519,9 @@ Your rules:
 - Acknowledge what the user has already told you; do NOT ask for information already provided
 - Never fabricate or assume complaint data
 - If the user has described their incident in detail, extract relevant info and only ask for what is missing
-- When asking about location, ask for their city and state in India"""
+- When asking for location, ask for city and state
+- When asking for email, explain it is for the complaint acknowledgement
+- NEVER repeat a question that has already been answered earlier in the conversation"""
 
         user_message = self._build_user_message(context)
 
