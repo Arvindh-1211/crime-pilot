@@ -34,17 +34,20 @@ async def start_session(request: Dict[str, Any] = Body(...)):
         "category_id": None,
         "filled_slots": {},
         "slot_queue": [],
-        "raw_description": None
+        "raw_description": None,
     }
 
     session_store.create_session(session_id, initial_data)
 
-    # Generate welcome message
-    welcome_message = f"Namaste! I'm your NCRP Cybercrime Assistant. I'll help you file a complaint for cyber incidents. What type of cybercrime did you experience? You can describe it in English or Hinglish."
+    welcome_message = (
+        "Hello! I'm your NCRP Cybercrime Assistant. "
+        "I'm here to help you file a complaint on the National Cybercrime Reporting Portal. "
+        "Please describe what happened to you."
+    )
 
     return {
         "session_id": session_id,
-        "welcome_message": welcome_message
+        "welcome_message": welcome_message,
     }
 
 
@@ -67,13 +70,11 @@ async def process_message(request: Dict[str, Any] = Body(...)):
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
-    # Verify session exists
     session = session_store.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found. Please start a new session.")
 
     try:
-        # Process message through dialogue manager
         result = dialogue_manager.process_message(session_id, message)
 
         return {
@@ -82,7 +83,9 @@ async def process_message(request: Dict[str, Any] = Body(...)):
             "progress": result["progress"],
             "category_id": result["category_id"],
             "filled_slots": result["filled_slots"],
-            "is_complete": result["is_complete"]
+            "is_complete": result["is_complete"],
+            "complaint_id": result.get("complaint_id"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+

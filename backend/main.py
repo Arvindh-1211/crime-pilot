@@ -1,5 +1,10 @@
 """Main FastAPI application for NCRP Cybercrime Assistant."""
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(".env.local")
+load_dotenv()
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
