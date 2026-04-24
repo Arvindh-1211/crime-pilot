@@ -245,6 +245,59 @@ class DialogueManager:
         session["state"] = DialogueState.COLLECTING_DESC
         return self._handle_collecting_desc(session, user_text)
 
+    def _handle_answering_scenarios(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
+        """Process scenario answers and move to slot filling when done."""
+        questions = session.get("scenario_questions", [])
+        idx = session.get("scenario_index", 0)
+        
+        # Save the answer
+        if idx < len(questions):
+            q = questions[idx]
+            answers = session.get("scenario_answers", {})
+            answers[q] = user_text
+            session["scenario_answers"] = answers
+            # Append to raw description for better context
+            existing = session.get("raw_description", "")
+            session["raw_description"] = f"{existing}\nUser answered '{q}': {user_text}"
+            
+        # Move to next question
+        idx += 1
+        session["scenario_index"] = idx
+        
+        if idx < len(questions):
+            # Ask the next scenario question
+            next_q = questions[idx]
+            bot_response = f"**Quick Question:** {next_q}"
+            session["conversation_history"].append(f"Assistant: {bot_response}")
+            return {
+                "bot_response": bot_response,
+                "progress": self._get_progress(session),
+                "category_id": session.get("category_id"),
+                "filled_slots": session.get("filled_slots", {}),
+            }
+        
+        # Scenarios finished, extract any newly mentioned slots
+        self._prefill_slots_from_description(session)
+        
+        # Transition to standard slot filling
+        session["state"] = DialogueState.FILLING_SLOTS
+        
+        # Ask the first empty slot
+        first_question = self._ask_next_slot(session)
+        if not first_question:
+            # Everything filled!
+            return self._transition_to_review(session, session["category_id"], session.get("filled_slots", {}))
+            
+        bot_response = f"Thank you for those details. Now, let's gather a few specific points:\n\n{first_question}"
+        session["conversation_history"].append(f"Assistant: {bot_response}")
+        
+        return {
+            "bot_response": bot_response,
+            "progress": self._get_progress(session),
+            "category_id": session.get("category_id"),
+            "filled_slots": session.get("filled_slots", {}),
+        }
+
     def _handle_filling_slots(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
         """Handle FILLING_SLOTS — validate and save the user's answer, ask the next slot."""
         category_id = session["category_id"]

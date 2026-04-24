@@ -133,7 +133,9 @@ class LLMHandler:
             logger.error(f"Failed to load taxonomy: {e}")
             self.taxonomy = {"categories": []}
 
-    def _get_category_label(self, category_id: str) -> str:
+    def _get_category_label(self, category_id: Optional[str]) -> str:
+        if not category_id:
+            return "Unknown Category"
         for cat in self.taxonomy.get("categories", []):
             if cat["id"] == category_id:
                 return cat["label"]
