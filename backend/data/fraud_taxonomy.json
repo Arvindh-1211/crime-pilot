@@ -1,0 +1,44 @@
+{
+  "categories": [
+    {
+      "id": "UPI_FRAUD",
+      "label": "UPI Fraud",
+      "description": "Fraud involving UPI (Unified Payments Interface) transactions including unauthorized transfers, fake QR codes, and UPI ID impersonation",
+      "keywords": ["upi fraud", "upi transaction", "upi money transfer", "fake upi", "upi id", "bhim app", "phonepe", "gpay", "paytm upi", "unauthorized transaction", "upi scam"],
+      "mandatory_slots": ["incident_date", "amount_lost", "upi_transaction_id", "suspect_upi_id", "platform"],
+      "optional_slots": ["screenshot", "utr_number"]
+    },
+    {
+      "id": "VISHING",
+      "label": "Vishing (Voice Phishing)",
+      "description": "Voice phishing attacks where fraudsters impersonate bank officials, government agents, or service providers over phone calls to steal money or information",
+      "keywords": ["vishing", "voice phishing", "phone call fraud", "bank call", "fake call", "caller impersonation", "missed call scam", "call for otp", "harassment call"],
+      "mandatory_slots": ["incident_date", "amount_lost", "caller_number", "bank_name"],
+      "optional_slots": ["call_recording", "otp_shared"]
+    },
+    {
+      "id": "PHISHING",
+      "label": "Phishing",
+      "description": "Online phishing attacks through fake websites, emails, or SMS designed to steal login credentials, personal information, or financial data",
+      "keywords": ["phishing", "fake website", "fake email", "phishing url", "login hack", "credential theft", "fake bank site", "suspicious link", "malware email"],
+      "mandatory_slots": ["incident_date", "phishing_url", "data_compromised"],
+      "optional_slots": ["email_screenshot", "bank_involved"]
+    },
+    {
+      "id": "INVESTMENT_SCAM",
+      "label": "Investment Scam",
+      "description": "Investment fraud where scammers promise high returns on investments in stocks, crypto, forex, or fake businesses, then disappear with the money",
+      "keywords": ["investment scam", "fake investment", "stock scam", "crypto fraud", "bitcoin fraud", "forex scam", "mutual fund scam", " Ponzi scheme", "high return investment", "investment fraud"],
+      "mandatory_slots": ["incident_date", "amount_invested", "platform_name", "recruiter_contact"],
+      "optional_slots": ["payment_proof", "amount_lost"]
+    },
+    {
+      "id": "SEXTORTION",
+      "label": "Sextortion",
+      "description": "Blackmail or extortion involving sexual content, images, or videos - perpetrators threaten to expose private material unless money is paid or more content is provided",
+      "keywords": ["sextortion", "blackmail", "sexual blackmail", "explicit photo scam", " porn blackmail", "rape threat", "intimate video scam", "social media blackmail", "whatsapp sextortion"],
+      "mandatory_slots": ["incident_date", "platform_used", "suspect_contact"],
+      "optional_slots": ["screenshot_available", "amount_demanded"]
+    }
+  ]
+}

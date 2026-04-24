@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .chat-container {
+    @apply flex flex-col h-full;
+  }
+
+  .message-bubble-user {
+    @apply self-end bg-blue-600 text-white rounded-2xl rounded-br-none px-4 py-3 shadow-sm max-w-[85%];
+  }
+
+  .message-bubble-assistant {
+    @apply self-start bg-white text-gray-800 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm max-w-[85%];
+  }
+
+  .slot-item {
+    @apply flex items-center py-1.5;
+  }
+
+  .slot-item.filled {
+    @apply text-gray-600;
+  }
+
+  .slot-item.pending {
+    @apply text-gray-400;
+  }
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* Fade animation for new messages */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Typing indicator animation */
+@keyframes bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}

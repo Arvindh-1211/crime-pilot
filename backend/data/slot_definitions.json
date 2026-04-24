@@ -1,0 +1,165 @@
+{
+  "slots": {
+    "incident_date": {
+      "question": "When did the incident occur? Please provide the date in any format (DD-MM-YYYY, YYYY-MM-DD, or even '2 days ago').",
+      "type": "date",
+      "validation_rule": "date_format",
+      "hint": "Example: 20-04-2025 or 2025-04-20 or yesterday",
+      "required": true
+    },
+    "amount_lost": {
+      "question": "How much money did you lose or send? Please tell me the amount.",
+      "type": "amount",
+      "validation_rule": "positive_number",
+      "hint": "Example: 50000 or 50,000 or ₹50000 or 50 thousand",
+      "required": true
+    },
+    "upi_transaction_id": {
+      "question": "What is the UPI transaction ID or reference number?",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: 123456789012 or TXN123456789",
+      "required": true
+    },
+    "suspect_upi_id": {
+      "question": "What is the suspect's UPI ID that received the money?",
+      "type": "upi_id",
+      "validation_rule": "upi_format",
+      "hint": "Example: suspect@okaxis or fraudster@hdfc",
+      "required": true
+    },
+    "platform": {
+      "question": "Which UPI platform/app was used? (e.g., Google Pay, PhonePe, Paytm, Bank App)",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: GPay or PhonePe or Paytm or SBI App",
+      "required": true
+    },
+    "caller_number": {
+      "question": "What was the caller's phone number?",
+      "type": "phone",
+      "validation_rule": "indian_phone",
+      "hint": "Example: 9876543210 or +919876543210",
+      "required": true
+    },
+    "bank_name": {
+      "question": "Which bank or financial institution did the caller claim to represent?",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: SBI or HDFC or ICICI or Paytm Payments Bank",
+      "required": true
+    },
+    "call_recording": {
+      "question": "Did you record the call? (You can upload it later if yes)",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    },
+    "otp_shared": {
+      "question": "Did you share any OTP with the caller?",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    },
+    "phishing_url": {
+      "question": "What was the phishing URL or website address?",
+      "type": "url",
+      "validation_rule": "url_format",
+      "hint": "Example: https://fake-bank-site.com or http://google-payment-support.com",
+      "required": true
+    },
+    "data_compromised": {
+      "question": "What data or information was compromised? (passwords, cards, personal info)",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: My credit card details or Login password or Aadhaar number",
+      "required": true
+    },
+    "email_screenshot": {
+      "question": "Do you have a screenshot of the phishing email or message? (You can upload it)",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    },
+    "bank_involved": {
+      "question": "Which bank or account was targeted in the phishing attack?",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: HDFC Bank or SBI Savings Account",
+      "required": false
+    },
+    "amount_invested": {
+      "question": "How much money did you invest in this scheme?",
+      "type": "amount",
+      "validation_rule": "positive_number",
+      "hint": "Example: 100000 or 1 lakh or ₹100000",
+      "required": true
+    },
+    "platform_name": {
+      "question": "Which platform or app was used for this investment?",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: Telegram or WhatsApp or a fake investment app",
+      "required": true
+    },
+    "recruiter_contact": {
+      "question": "How can you be contacted by the recruiter or person who guided you?",
+      "type": "phone",
+      "validation_rule": "indian_phone",
+      "hint": "Example: 8765432100 or +918765432100",
+      "required": true
+    },
+    "payment_proof": {
+      "question": "Do you have any payment proof like screenshot or transaction ID? (You can upload it)",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    },
+    "platform_used": {
+      "question": "Which platform or app was used by the suspect? (WhatsApp, Telegram, Instagram, etc.)",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: WhatsApp or Telegram or Instagram DM",
+      "required": true
+    },
+    "suspect_contact": {
+      "question": "What is the suspect's contact information (phone/ID)?",
+      "type": "phone",
+      "validation_rule": "indian_phone",
+      "hint": "Example: 9876512345 or +919876512345",
+      "required": true
+    },
+    "screenshot_available": {
+      "question": "Do you have any screenshots of the conversations? (You can upload them)",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    },
+    "amount_demanded": {
+      "question": "How much money did they demand from you?",
+      "type": "amount",
+      "validation_rule": "positive_number",
+      "hint": "Example: 50000 or 50 thousand or ₹50000",
+      "required": false
+    },
+    "utr_number": {
+      "question": "Do you have the UTR (Unique Transaction Reference) number? (You can upload it later)",
+      "type": "text",
+      "validation_rule": "not_empty",
+      "hint": "Example: 123456789012",
+      "required": false
+    },
+    "screenshot": {
+      "question": "Do you have any screenshot of the transaction or conversation? (You can upload it)",
+      "type": "boolean",
+      "validation_rule": "yes_no",
+      "hint": "Answer: Yes or No",
+      "required": false
+    }
+  }
+}
