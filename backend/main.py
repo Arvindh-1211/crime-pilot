@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import chat, complaint, upload
+from routes import chat, complaint, upload, officer
 
 
 @asynccontextmanager
@@ -62,7 +62,8 @@ async def root():
         "endpoints": {
             "chat": "/chat/start, /chat/message",
             "complaint": "/complaint/submit, /complaint/{id}",
-            "upload": "/upload/evidence"
+            "upload": "/upload/evidence",
+            "officer": "/officer/login, /officer/complaints"
         }
     }
 
@@ -77,6 +78,7 @@ async def health_check():
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(complaint.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
+app.include_router(officer.router, prefix="/api/v1")
 
 
 if __name__ == "__main__":
