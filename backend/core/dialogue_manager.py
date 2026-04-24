@@ -19,6 +19,8 @@ class DialogueState(str, Enum):
     COLLECTING_DESC = "COLLECTING_DESC"
     CONFIRMING_CAT = "CONFIRMING_CAT"
     FILLING_SLOTS = "FILLING_SLOTS"
+    ANSWERING_SCENARIOS = "ANSWERING_SCENARIOS"
+    DUPLICATE_CHECK = "DUPLICATE_CHECK"
     REVIEWING = "REVIEWING"
     SUBMITTED = "SUBMITTED"
 
@@ -102,6 +104,10 @@ class DialogueManager:
             return self._handle_confirming_cat(session, user_text)
         elif state == DialogueState.FILLING_SLOTS:
             return self._handle_filling_slots(session, user_text)
+        elif state == DialogueState.ANSWERING_SCENARIOS:
+            return self._handle_answering_scenarios(session, user_text)
+        elif state == DialogueState.DUPLICATE_CHECK:
+            return self._handle_duplicate_check(session, user_text)
         elif state == DialogueState.REVIEWING:
             return self._handle_reviewing(session, user_text)
         elif state == DialogueState.SUBMITTED:
@@ -175,11 +181,12 @@ class DialogueManager:
                 "filled_slots": session.get("filled_slots", {}),
             }
 
-        # Description is sufficient — classify using Gemini (falls back to sentence-transformers)
+        # Description is sufficient — classify using Gemini 3.1
         llm_category = llm_handler.classify_with_llm(accumulated)
         if llm_category:
             session["category_id"] = llm_category
         else:
+            # Fallback for robustness
             classification = intent_classifier.classify(accumulated)
             session["category_id"] = classification["category_id"]
 
@@ -188,8 +195,7 @@ class DialogueManager:
         session["slot_queue"] = slot_engine.load_slots(session["category_id"])
         self._prefill_slots_from_description(session)
 
-        # Announce the detected category — inform, don't ask for confirmation
-        category_label = self._get_category_label(session["category_id"])
+        category_label = llm_handler._get_category_label(session["category_id"])
 
         # If all slots were pre-filled from the description, jump straight to review
         next_slot = slot_engine.get_next_empty_slot(
@@ -200,12 +206,30 @@ class DialogueManager:
                 session, session["category_id"], session.get("filled_slots", {})
             )
 
-        # Announce category then ask first missing slot
-        first_question = self._ask_next_slot(session)
-        bot_response = (
-            f"Based on your description, this appears to be a case of **{category_label}**. "
-            f"I'll need a few more details.\n\n{first_question}"
-        )
+        # Build dynamic intro and fetch dynamic scenario questions
+        scenario_questions = llm_handler.get_scenario_questions(session["category_id"])
+        
+        intro_context = {
+            "current_state": "CATEGORY_IDENTIFIED",
+            "category_label": category_label,
+            "raw_description": accumulated,
+            "conversation_history": session.get("conversation_history", []),
+        }
+        intro = llm_handler.generate_response(intro_context)
+        
+        if scenario_questions:
+            # Shift flow to scenario verification
+            first_q = scenario_questions[0]
+            bot_response = f"{intro}\n\n**Quick Question:** {first_q}"
+            session["scenario_questions"] = scenario_questions
+            session["scenario_index"] = 0
+            session["scenario_answers"] = {}
+            session["state"] = "ANSWERING_SCENARIOS" # New transient state handled by router
+        else:
+            # Direct to slot filling
+            first_question = self._ask_next_slot(session)
+            bot_response = f"{intro}\n\n{first_question}"
+
         session["conversation_history"].append(f"Assistant: {bot_response}")
         return {
             "bot_response": bot_response,
@@ -364,6 +388,73 @@ class DialogueManager:
         }
         return llm_handler.generate_response(context)
 
+    def _transition_to_duplicate_check(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Run duplicate detection before review."""
+        raw_description = session.get("raw_description", "")
+        filled_slots = session.get("filled_slots", {})
+        
+        # Phone number simulation (in real app, from auth or initial prompt)
+        phone_number = session.get("phone_number", "unknown_user")
+        
+        # Layer 1 & 2 Duplicate Check
+        dup_result = duplicate_checker.check(phone_number, filled_slots, raw_description)
+        
+        if dup_result["is_duplicate"]:
+            session["state"] = DialogueState.DUPLICATE_CHECK
+            session["matched_complaint_id"] = dup_result["matched_complaint_id"]
+            bot_response = (
+                f"⚠️ **Duplicate Detected**\n\n"
+                f"It looks like this incident was already reported (Ticket ID: {dup_result['matched_complaint_id']}). "
+                f"Do you want to update that complaint, or file a new one?"
+            )
+            session["conversation_history"].append(f"Assistant: {bot_response}")
+            return {
+                "bot_response": bot_response,
+                "progress": self._get_progress(session),
+                "category_id": session.get("category_id"),
+                "filled_slots": filled_slots,
+            }
+            
+        return self._transition_to_review(session, session["category_id"], filled_slots)
+
+    def _handle_duplicate_check(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
+        """Handle response to duplicate detection prompt."""
+        text = user_text.lower()
+        if "new" in text or "file a new" in text or "no" in text:
+            # Proceed to review as a new complaint
+            return self._transition_to_review(session, session["category_id"], session.get("filled_slots", {}))
+        else:
+            # Update existing (mocking behavior for now)
+            session["state"] = DialogueState.SUBMITTED
+            bot_response = f"Got it. I will append this new information to your existing Ticket {session['matched_complaint_id']}."
+            return {
+                "bot_response": bot_response,
+                "progress": 100,
+                "category_id": session.get("category_id"),
+                "filled_slots": session.get("filled_slots", {}),
+                "is_complete": True,
+            }
+
+    def _calculate_severity(self, category_id: str, filled_slots: Dict[str, Any]) -> str:
+        """Calculate severity score based on amount lost and category."""
+        amount_lost = 0
+        try:
+            amt_str = filled_slots.get("amount_lost", "") or filled_slots.get("amount_invested", "0")
+            # Strip non-numeric
+            amt_num = "".join(filter(str.isdigit, str(amt_str)))
+            if amt_num:
+                amount_lost = float(amt_num)
+        except:
+            pass
+            
+        if amount_lost > 500000 or category_id == "SEXTORTION":
+            return "Critical 🔴"
+        elif amount_lost > 50000 or category_id in ["RANSOMWARE", "SIM_SWAP_FRAUD"]:
+            return "High 🟠"
+        elif amount_lost > 5000:
+            return "Medium 🟡"
+        return "Low 🟢"
+
     def _transition_to_review(
         self,
         session: Dict[str, Any],
@@ -419,19 +510,24 @@ class DialogueManager:
         raw_desc = session.get("raw_description", "")
         desc_snippet = (raw_desc[:120] + "...") if len(raw_desc) > 120 else raw_desc
 
+        severity = self._calculate_severity(category_id, filled_slots)
+
         summary_parts = [
-            f"📋 **Complaint Summary**",
+            f"📋 **Complaint Review & Summary**",
             f"**Complaint Type**: {category_label}",
+            f"**Severity Rating**: {severity}",
             f"**Your Description**: {desc_snippet}",
         ]
         if lines:
-            summary_parts.append("**Details collected:**")
+            summary_parts.append("\n**Details collected:**")
             summary_parts.extend(lines)
 
         summary = "\n".join(summary_parts)
         bot_response = (
             f"{summary}\n\n"
-            "Please review the above. Reply **Yes** to submit your complaint or **No** to make changes."
+            "Please review the details above.\n"
+            "If everything is correct, say **'Submit Complaint'** to generate your official ticket.\n"
+            "If you need to change anything, simply tell me what to update (e.g., 'Change the amount to 5000')."
         )
         session["conversation_history"].append(f"Assistant: {bot_response}")
         return {
@@ -488,11 +584,19 @@ class DialogueManager:
         except Exception:
             pass
 
+        edu_summary = llm_handler.generate_educational_summary(session.get("category_id", ""))
+        
+        station_name = station["name"] if "name" in station else str(station)
+        
         bot_response = (
-            f"✅ Your complaint has been successfully submitted!\n\n"
-            f"**Complaint ID: {complaint_id}**\n\n"
-            f"Please save this ID for future reference. "
-            f"Authorities will review your complaint and get in touch with you."
+            f"✅ **Your complaint has been successfully submitted.**\n\n"
+            f"🎫 **Tracking ID**: `{complaint_id}`\n"
+            f"📍 **Routed To**: {station_name} Cyber Cell\n"
+            f"🚨 **Severity Rating**: {severity_score}\n"
+            f"⏳ **Status**: Received — Under Review\n\n"
+            f"**Next Steps:**\n"
+            f"You do not need to create an account. Simply enter your Tracking ID (`{complaint_id}`) on our homepage to check the status of your complaint at any time.\n"
+            f"{edu_summary}"
         )
         session["conversation_history"].append(f"Assistant: {bot_response}")
         return {

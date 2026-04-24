@@ -1,44 +1,83 @@
 {
+  "version": "2.0.0",
   "categories": [
     {
       "id": "UPI_FRAUD",
-      "label": "UPI Fraud",
-      "description": "Fraud involving UPI (Unified Payments Interface) transactions including unauthorized transfers, fake QR codes, and UPI ID impersonation",
-      "keywords": ["upi fraud", "upi transaction", "upi money transfer", "fake upi", "upi id", "bhim app", "phonepe", "gpay", "paytm upi", "unauthorized transaction", "upi scam"],
-      "mandatory_slots": ["incident_date", "amount_lost", "upi_transaction_id", "suspect_upi_id", "platform"],
-      "optional_slots": ["screenshot", "utr_number"]
+      "label": "UPI / Payment App Fraud",
+      "description": "Fraud involving UPI apps (PhonePe, Google Pay, Paytm) via fake QR codes, collect requests, or PIN theft.",
+      "keywords": ["upi", "qr code", "phonepe", "gpay", "paytm", "collect request", "pin", "mismatch"]
     },
     {
       "id": "VISHING",
-      "label": "Vishing (Voice Phishing)",
-      "description": "Voice phishing attacks where fraudsters impersonate bank officials, government agents, or service providers over phone calls to steal money or information",
-      "keywords": ["vishing", "voice phishing", "phone call fraud", "bank call", "fake call", "caller impersonation", "missed call scam", "call for otp", "harassment call"],
-      "mandatory_slots": ["incident_date", "amount_lost", "caller_number", "bank_name"],
-      "optional_slots": ["call_recording", "otp_shared"]
+      "label": "Vishing (Voice Call Impersonation)",
+      "description": "Voice calls pretending to be bank officials, police, or government agents to steal OTPs or sensitive info.",
+      "keywords": ["call", "officer", "bank", "kyc", "blocked", "otp shared", "impersonation", "fake department"]
     },
     {
       "id": "PHISHING",
-      "label": "Phishing",
-      "description": "Online phishing attacks through fake websites, emails, or SMS designed to steal login credentials, personal information, or financial data",
-      "keywords": ["phishing", "fake website", "fake email", "phishing url", "login hack", "credential theft", "fake bank site", "suspicious link", "malware email"],
-      "mandatory_slots": ["incident_date", "phishing_url", "data_compromised"],
-      "optional_slots": ["email_screenshot", "bank_involved"]
+      "label": "Phishing (Fake Links/Websites)",
+      "description": "Deceptive links via SMS/Email leading to cloned websites to steal login credentials or card details.",
+      "keywords": ["link", "website", "sms", "email", "cloned", "login", "password", "card details", "url"]
     },
     {
       "id": "INVESTMENT_SCAM",
-      "label": "Investment Scam",
-      "description": "Investment fraud where scammers promise high returns on investments in stocks, crypto, forex, or fake businesses, then disappear with the money",
-      "keywords": ["investment scam", "fake investment", "stock scam", "crypto fraud", "bitcoin fraud", "forex scam", "mutual fund scam", " Ponzi scheme", "high return investment", "investment fraud"],
-      "mandatory_slots": ["incident_date", "amount_invested", "platform_name", "recruiter_contact"],
-      "optional_slots": ["payment_proof", "amount_lost"]
+      "label": "Investment / Trading Scam",
+      "description": "Fraudulent schemes promising high returns via fake crypto, stocks, or task-based apps on Telegram/WhatsApp.",
+      "keywords": ["invest", "profit", "crypto", "trading", "returns", "telegram group", "stock", "task fraud", "wallet"]
     },
     {
       "id": "SEXTORTION",
-      "label": "Sextortion",
-      "description": "Blackmail or extortion involving sexual content, images, or videos - perpetrators threaten to expose private material unless money is paid or more content is provided",
-      "keywords": ["sextortion", "blackmail", "sexual blackmail", "explicit photo scam", " porn blackmail", "rape threat", "intimate video scam", "social media blackmail", "whatsapp sextortion"],
-      "mandatory_slots": ["incident_date", "platform_used", "suspect_contact"],
-      "optional_slots": ["screenshot_available", "amount_demanded"]
+      "label": "Sextortion / Blackmail",
+      "description": "Blackmail involving intimate video recordings or morphed images shared on social media.",
+      "keywords": ["video call", "nude", "blackmail", "morphed", "threat", "instagram", "facebook", "extortion"]
+    },
+    {
+      "id": "ONLINE_SHOPPING_FRAUD",
+      "label": "Online Shopping / E-commerce Fraud",
+      "description": "Fake websites selling items that are never delivered, or receiving empty/fake products.",
+      "keywords": ["order", "delivered", "fake website", "amazon fake", "flipkart fake", "payment made", "no delivery"]
+    },
+    {
+      "id": "JOB_FRAUD",
+      "label": "Job / Recruitment Fraud",
+      "description": "Fake job offers demanding 'registration fees', 'laptop security', or 'training charges'.",
+      "keywords": ["job offer", "recruitment", "registration fee", "work from home", "hr", "naukri fake", "linkedin fake"]
+    },
+    {
+      "id": "SOCIAL_MEDIA_IMPERSONATION",
+      "label": "Social Media Impersonation / Hacking",
+      "description": "Hacking social media accounts or creating fake profiles to borrow money from friends/family.",
+      "keywords": ["hacked", "fake profile", "borrow money", "identity theft", "instagram hack", "facebook hack", "friends"]
+    },
+    {
+      "id": "RANSOMWARE",
+      "label": "Ransomware / Malware Attack",
+      "description": "Encryption of computer files by malicious software demanding a ransom for the decryption key.",
+      "keywords": ["files encrypted", "ransom", "bitcoin", "hacker", "virus", "malware", "system locked", ".locked"]
+    },
+    {
+      "id": "SIM_SWAP_FRAUD",
+      "label": "SIM Swapping",
+      "description": "Fraudsters obtaining a duplicate SIM card of your number to gain access to OTPs and bank accounts.",
+      "keywords": ["sim block", "no signal", "duplicate sim", "otp stolen", "network lost", "telco", "porting"]
+    },
+    {
+      "id": "ROMANCE_SCAM",
+      "label": "Romance / Dating Scam",
+      "description": "Fraudsters feigning romantic interest on dating apps to trick victims into sending money or gifts.",
+      "keywords": ["dating app", "tinder", "bumble", "medical emergency", "customs fee", "gift", "love", "abroad"]
+    },
+    {
+      "id": "LOTTERY_FRAUD",
+      "label": "Lottery / KBC / Prize Fraud",
+      "description": "Fake messages claiming you won a lottery or KBC prize and asking for 'processing fees'.",
+      "keywords": ["lottery", "kbc", "prize", "won", "processing fee", "tax payment", "amitabh bachchan", "whatsapp call"]
+    },
+    {
+      "id": "ADHAR_ENABLED_PAYMENT_FRAUD",
+      "label": "Aadhaar Enabled Payment System (AePS) Fraud",
+      "description": "Unauthorized withdrawal of money from bank accounts using biometric details and Aadhaar number.",
+      "keywords": ["aadhaar", "fingerprint", "biometric", "aeps", "bank withdrawal", "unauthorized", "ration shop"]
     }
   ]
 }

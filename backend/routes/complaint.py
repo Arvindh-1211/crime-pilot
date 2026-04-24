@@ -177,3 +177,21 @@ def route_to_station(location: str) -> dict:
     return {"name": "Central Cyber Crime Coordination Centre (I4C)",
             "jurisdiction": "National – India"}
 
+@router.get("/complaint/{complaint_id}/status")
+async def get_complaint_status(complaint_id: str):
+    """Public endpoint to check complaint status by ID only (no login)."""
+    complaint = complaint_store.get(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Tracking ID not found")
+        
+    # Return only non-sensitive public tracking data
+    return {
+        "complaint_id": complaint.get("complaint_id"),
+        "status": complaint.get("status", "pending"),
+        "assigned_station": complaint.get("assigned_station"),
+        "date_filed": complaint.get("date_filed"),
+        "fir_number": complaint.get("fir_number"),
+        "last_updated": complaint.get("status_updated_at") or complaint.get("date_filed"),
+        "severity": complaint.get("severity_score")
+    }
+
