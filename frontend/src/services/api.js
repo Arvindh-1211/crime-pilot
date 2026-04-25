@@ -30,6 +30,16 @@ export const sendMessage = async (sessionId, message) => {
 };
 
 /**
+ * Refine transcribed speech text via LLM
+ * @param {string} text - Raw transcribed speech
+ * @returns {Promise<{refined_text: string}>}
+ */
+export const refineSpeech = async (text) => {
+  const response = await api.post('/chat/refine', { text });
+  return response.data;
+};
+
+/**
  * Submit the completed complaint
  * @param {string} sessionId - Session ID
  * @param {Object} formData - Contact details from the frontend form
@@ -78,6 +88,16 @@ export const getComplaint = async (complaintId) => {
 };
 
 /**
+ * Public endpoint to track complaint status by Tracking ID
+ * @param {string} trackingId - Tracking ID
+ * @returns {Promise<{complaint_id: string, status: string, assigned_station: string, date_filed: string, fir_number: string, last_updated: string, severity: string}>}
+ */
+export const checkComplaintStatus = async (trackingId) => {
+  const response = await api.get(`/complaint/${trackingId}/status`);
+  return response.data;
+};
+
+/**
  * List all complaints (admin/debug endpoint)
  * @returns {Promise<{complaints: Array, total: number}>}
  */
@@ -88,62 +108,67 @@ export const listComplaints = async () => {
 
 // ── Officer Dashboard API ────────────────────────────────────────────────────
 
-/**
- * Authenticate an officer
- * @param {string} username
- * @param {string} password
- * @returns {Promise<{token: string, role: string, name: string, badge: string, station: string}>}
- */
+const getOfficerToken = () => sessionStorage.getItem('officer_token');
+
+const officerApi = axios.create({
+  baseURL: 'http://localhost:8000/api/v1',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+officerApi.interceptors.request.use((config) => {
+  const token = getOfficerToken();
+  if (token) config.headers['Authorization'] = `Bearer ${token}`;
+  return config;
+});
+
 export const officerLogin = async (username, password) => {
   const response = await api.post('/officer/login', { username, password });
   return response.data;
 };
 
-/**
- * Fetch all complaints with tracking metrics (officer dashboard)
- * @returns {Promise<{complaints: Array, metrics: Object}>}
- */
 export const officerGetComplaints = async () => {
-  const response = await api.get('/officer/complaints');
+  const response = await officerApi.get('/officer/complaints');
   return response.data;
 };
 
-/**
- * Get single complaint detail
- * @param {string} complaintId
- */
 export const officerGetComplaintDetail = async (complaintId) => {
-  const response = await api.get(`/officer/complaints/${complaintId}`);
+  const response = await officerApi.get(`/officer/complaints/${complaintId}`);
   return response.data;
 };
 
-/**
- * Update complaint status (accepted / rejected / transferred)
- * @param {string} complaintId
- * @param {string} status
- */
-export const officerUpdateStatus = async (complaintId, status) => {
-  const response = await api.put(`/officer/complaints/${complaintId}/status`, { status });
+export const officerAccept = async (complaintId) => {
+  const response = await officerApi.put(`/officer/complaints/${complaintId}/accept`);
   return response.data;
 };
 
-/**
- * Assign an FIR number to a complaint
- * @param {string} complaintId
- * @param {string} firNumber
- */
+export const officerReject = async (complaintId, reason) => {
+  const response = await officerApi.put(`/officer/complaints/${complaintId}/reject`, { reason });
+  return response.data;
+};
+
 export const officerAssignFir = async (complaintId, firNumber) => {
-  const response = await api.put(`/officer/complaints/${complaintId}/fir`, { fir_number: firNumber });
+  const response = await officerApi.put(`/officer/complaints/${complaintId}/fir`, { fir_number: firNumber });
   return response.data;
 };
 
-/**
- * Transfer complaint to another station
- * @param {string} complaintId
- * @param {string} targetStation
- */
-export const officerTransferComplaint = async (complaintId, targetStation) => {
-  const response = await api.put(`/officer/complaints/${complaintId}/transfer`, { target_station: targetStation });
+export const officerTransferComplaint = async (complaintId, targetStation, notes = '') => {
+  const response = await officerApi.put(`/officer/complaints/${complaintId}/transfer`, { target_station: targetStation, notes });
+  return response.data;
+};
+
+export const officerUpdateStatus = async (complaintId, status, extra = {}) => {
+  const response = await officerApi.put(`/officer/complaints/${complaintId}/status`, { status, ...extra });
+  return response.data;
+};
+
+export const officerGetAdminMetrics = async () => {
+  const response = await officerApi.get('/officer/admin/metrics');
+  return response.data;
+};
+
+export const officerGetAuditLog = async (complaintId) => {
+  const url = complaintId ? `/officer/audit/${complaintId}` : '/officer/audit';
+  const response = await officerApi.get(url);
   return response.data;
 };
 

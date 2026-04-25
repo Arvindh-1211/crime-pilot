@@ -101,3 +101,25 @@ async def process_message(request: Dict[str, Any] = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
+
+@router.post("/chat/refine")
+async def refine_speech_text(request: Dict[str, Any] = Body(...)):
+    """Refine transcribed speech text.
+    
+    Args:
+        request: {text: str}
+        
+    Returns:
+        {refined_text: str}
+    """
+    text = request.get("text", "")
+    if not text:
+        return {"refined_text": ""}
+        
+    try:
+        # Import here to avoid circular imports if any, or use existing from core.dialogue_manager
+        from core.llm_handler import llm_handler
+        refined = llm_handler.refine_speech(text)
+        return {"refined_text": refined}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error refining speech: {str(e)}")

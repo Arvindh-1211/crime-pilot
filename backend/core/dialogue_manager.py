@@ -11,6 +11,42 @@ from .llm_handler import llm_handler
 from .duplicate_checker import duplicate_checker
 from .complaint_builder import complaint_builder
 from .complaint_store import complaint_store
+from routes.complaint import route_to_station
+
+
+# Minimal station routing data (mirrors routes/complaint.py)
+_CYBER_STATIONS = [
+    {"keywords": ["mumbai", "thane", "navi mumbai", "maharashtra"],
+     "name": "Mumbai Cyber Crime Police Station", "jurisdiction": "Mumbai Metropolitan Region"},
+    {"keywords": ["delhi", "new delhi", "noida", "gurgaon", "gurugram"],
+     "name": "Delhi Cyber Crime Unit – Dwarka", "jurisdiction": "NCR Delhi Region"},
+    {"keywords": ["bangalore", "bengaluru", "karnataka", "mysore"],
+     "name": "Bengaluru CID Cyber Crime Division", "jurisdiction": "Karnataka State"},
+    {"keywords": ["chennai", "tamil nadu", "coimbatore", "madurai"],
+     "name": "Chennai Cyber Crime Cell – Egmore", "jurisdiction": "Tamil Nadu State"},
+    {"keywords": ["hyderabad", "telangana", "secunderabad"],
+     "name": "Hyderabad Cyber Crime Police Station", "jurisdiction": "Telangana State"},
+    {"keywords": ["kolkata", "west bengal", "howrah"],
+     "name": "Kolkata Cyber Crime Police Station – Lalbazar", "jurisdiction": "West Bengal State"},
+    {"keywords": ["ahmedabad", "gujarat", "surat", "vadodara"],
+     "name": "Gujarat CID Cyber Crime Cell", "jurisdiction": "Gujarat State"},
+    {"keywords": ["pune", "nagpur"],
+     "name": "Pune Cyber Crime Cell", "jurisdiction": "Pune Division"},
+    {"keywords": ["lucknow", "uttar pradesh", "kanpur", "varanasi"],
+     "name": "UP Cyber Crime Cell – Lucknow", "jurisdiction": "Uttar Pradesh State"},
+    {"keywords": ["jaipur", "rajasthan", "jodhpur"],
+     "name": "Rajasthan Cyber Crime Cell – Jaipur", "jurisdiction": "Rajasthan State"},
+]
+
+
+def _route_to_station(location: str) -> dict:
+    if not location:
+        return {"name": "Central Cyber Crime Coordination Centre (I4C)", "jurisdiction": "National – India"}
+    loc = location.lower().strip()
+    for s in _CYBER_STATIONS:
+        if any(kw in loc for kw in s["keywords"]):
+            return {"name": s["name"], "jurisdiction": s["jurisdiction"]}
+    return {"name": "Central Cyber Crime Coordination Centre (I4C)", "jurisdiction": "National – India"}
 
 
 # Minimal station routing data (mirrors routes/complaint.py)
@@ -54,6 +90,8 @@ class DialogueState(str, Enum):
     COLLECTING_DESC = "COLLECTING_DESC"
     CONFIRMING_CAT = "CONFIRMING_CAT"
     FILLING_SLOTS = "FILLING_SLOTS"
+    ANSWERING_SCENARIOS = "ANSWERING_SCENARIOS"
+    DUPLICATE_CHECK = "DUPLICATE_CHECK"
     REVIEWING = "REVIEWING"
     SUBMITTED = "SUBMITTED"
 
@@ -140,6 +178,10 @@ class DialogueManager:
             return self._handle_confirming_cat(session, user_text)
         elif state == DialogueState.FILLING_SLOTS:
             return self._handle_filling_slots(session, user_text)
+        elif state == DialogueState.ANSWERING_SCENARIOS:
+            return self._handle_answering_scenarios(session, user_text)
+        elif state == DialogueState.DUPLICATE_CHECK:
+            return self._handle_duplicate_check(session, user_text)
         elif state == DialogueState.REVIEWING:
             return self._handle_reviewing(session, user_text)
         elif state == DialogueState.SUBMITTED:
@@ -203,6 +245,7 @@ class DialogueManager:
         if llm_category:
             session["category_id"] = llm_category
         else:
+            # Fallback for robustness
             classification = intent_classifier.classify(accumulated)
             session["category_id"] = classification["category_id"]
 
@@ -223,7 +266,7 @@ class DialogueManager:
         # Pre-fill what we can extract from the description
         self._prefill_slots_from_description(session)
 
-        category_label = self._get_category_label(session["category_id"])
+        category_label = llm_handler._get_category_label(session["category_id"])
 
         next_slot = slot_engine.get_next_empty_slot(
             session["slot_queue"], session.get("filled_slots", {})
@@ -233,11 +276,30 @@ class DialogueManager:
                 session, session["category_id"], session.get("filled_slots", {})
             )
 
-        first_question = self._ask_next_slot(session)
-        bot_response = (
-            f"I've identified this as a case of **{category_label}**. "
-            f"I'll now collect the details needed for your complaint.\n\n{first_question}"
-        )
+        # Build dynamic intro and fetch dynamic scenario questions
+        scenario_questions = llm_handler.get_scenario_questions(session["category_id"])
+        
+        intro_context = {
+            "current_state": "CATEGORY_IDENTIFIED",
+            "category_label": category_label,
+            "raw_description": accumulated,
+            "conversation_history": session.get("conversation_history", []),
+        }
+        intro = llm_handler.generate_response(intro_context)
+        
+        if scenario_questions:
+            # Shift flow to scenario verification
+            first_q = scenario_questions[0]
+            bot_response = f"{intro}\n\n**Quick Question:** {first_q}"
+            session["scenario_questions"] = scenario_questions
+            session["scenario_index"] = 0
+            session["scenario_answers"] = {}
+            session["state"] = "ANSWERING_SCENARIOS" # New transient state handled by router
+        else:
+            # Direct to slot filling
+            first_question = self._ask_next_slot(session)
+            bot_response = f"{intro}\n\n{first_question}"
+
         session["conversation_history"].append(f"Assistant: {bot_response}")
         return {
             "bot_response": bot_response,
@@ -250,6 +312,59 @@ class DialogueManager:
         """Deprecated — redirect to collecting desc."""
         session["state"] = DialogueState.COLLECTING_DESC
         return self._handle_collecting_desc(session, user_text)
+
+    def _handle_answering_scenarios(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
+        """Process scenario answers and move to slot filling when done."""
+        questions = session.get("scenario_questions", [])
+        idx = session.get("scenario_index", 0)
+        
+        # Save the answer
+        if idx < len(questions):
+            q = questions[idx]
+            answers = session.get("scenario_answers", {})
+            answers[q] = user_text
+            session["scenario_answers"] = answers
+            # Append to raw description for better context
+            existing = session.get("raw_description", "")
+            session["raw_description"] = f"{existing}\nUser answered '{q}': {user_text}"
+            
+        # Move to next question
+        idx += 1
+        session["scenario_index"] = idx
+        
+        if idx < len(questions):
+            # Ask the next scenario question
+            next_q = questions[idx]
+            bot_response = f"**Quick Question:** {next_q}"
+            session["conversation_history"].append(f"Assistant: {bot_response}")
+            return {
+                "bot_response": bot_response,
+                "progress": self._get_progress(session),
+                "category_id": session.get("category_id"),
+                "filled_slots": session.get("filled_slots", {}),
+            }
+        
+        # Scenarios finished, extract any newly mentioned slots
+        self._prefill_slots_from_description(session)
+        
+        # Transition to standard slot filling
+        session["state"] = DialogueState.FILLING_SLOTS
+        
+        # Ask the first empty slot
+        first_question = self._ask_next_slot(session)
+        if not first_question:
+            # Everything filled!
+            return self._transition_to_review(session, session["category_id"], session.get("filled_slots", {}))
+            
+        bot_response = f"Thank you for those details. Now, let's gather a few specific points:\n\n{first_question}"
+        session["conversation_history"].append(f"Assistant: {bot_response}")
+        
+        return {
+            "bot_response": bot_response,
+            "progress": self._get_progress(session),
+            "category_id": session.get("category_id"),
+            "filled_slots": session.get("filled_slots", {}),
+        }
 
     def _handle_filling_slots(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
         """Handle FILLING_SLOTS — validate and save answer, ask next slot."""
@@ -428,6 +543,73 @@ class DialogueManager:
         }
         return llm_handler.generate_response(context)
 
+    def _transition_to_duplicate_check(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Run duplicate detection before review."""
+        raw_description = session.get("raw_description", "")
+        filled_slots = session.get("filled_slots", {})
+        
+        # Phone number simulation (in real app, from auth or initial prompt)
+        phone_number = session.get("phone_number", "unknown_user")
+        
+        # Layer 1 & 2 Duplicate Check
+        dup_result = duplicate_checker.check(phone_number, filled_slots, raw_description)
+        
+        if dup_result["is_duplicate"]:
+            session["state"] = DialogueState.DUPLICATE_CHECK
+            session["matched_complaint_id"] = dup_result["matched_complaint_id"]
+            bot_response = (
+                f"⚠️ **Duplicate Detected**\n\n"
+                f"It looks like this incident was already reported (Ticket ID: {dup_result['matched_complaint_id']}). "
+                f"Do you want to update that complaint, or file a new one?"
+            )
+            session["conversation_history"].append(f"Assistant: {bot_response}")
+            return {
+                "bot_response": bot_response,
+                "progress": self._get_progress(session),
+                "category_id": session.get("category_id"),
+                "filled_slots": filled_slots,
+            }
+            
+        return self._transition_to_review(session, session["category_id"], filled_slots)
+
+    def _handle_duplicate_check(self, session: Dict[str, Any], user_text: str) -> Dict[str, Any]:
+        """Handle response to duplicate detection prompt."""
+        text = user_text.lower()
+        if "new" in text or "file a new" in text or "no" in text:
+            # Proceed to review as a new complaint
+            return self._transition_to_review(session, session["category_id"], session.get("filled_slots", {}))
+        else:
+            # Update existing (mocking behavior for now)
+            session["state"] = DialogueState.SUBMITTED
+            bot_response = f"Got it. I will append this new information to your existing Ticket {session['matched_complaint_id']}."
+            return {
+                "bot_response": bot_response,
+                "progress": 100,
+                "category_id": session.get("category_id"),
+                "filled_slots": session.get("filled_slots", {}),
+                "is_complete": True,
+            }
+
+    def _calculate_severity(self, category_id: str, filled_slots: Dict[str, Any]) -> str:
+        """Calculate severity score based on amount lost and category."""
+        amount_lost = 0
+        try:
+            amt_str = filled_slots.get("amount_lost", "") or filled_slots.get("amount_invested", "0")
+            # Strip non-numeric
+            amt_num = "".join(filter(str.isdigit, str(amt_str)))
+            if amt_num:
+                amount_lost = float(amt_num)
+        except:
+            pass
+            
+        if amount_lost > 500000 or category_id == "SEXTORTION":
+            return "Critical 🔴"
+        elif amount_lost > 50000 or category_id in ["RANSOMWARE", "SIM_SWAP_FRAUD"]:
+            return "High 🟠"
+        elif amount_lost > 5000:
+            return "Medium 🟡"
+        return "Low 🟢"
+
     def _transition_to_review(
         self,
         session: Dict[str, Any],
@@ -451,11 +633,14 @@ class DialogueManager:
             lines.append(f"• **{label}**: {display}")
 
         raw_desc = session.get("raw_description", "")
-        desc_snippet = (raw_desc[:120] + "…") if len(raw_desc) > 120 else raw_desc
+        desc_snippet = (raw_desc[:120] + "...") if len(raw_desc) > 120 else raw_desc
+
+        severity = self._calculate_severity(category_id, filled_slots)
 
         summary_parts = [
-            "📋 **Complaint Summary**",
+            f"📋 **Complaint Review & Summary**",
             f"**Complaint Type**: {category_label}",
+            f"**Severity Rating**: {severity}",
             f"**Your Description**: {desc_snippet}",
         ]
         if lines:
@@ -465,7 +650,9 @@ class DialogueManager:
         summary = "\n".join(summary_parts)
         bot_response = (
             f"{summary}\n\n"
-            "Please review the above. Reply **Yes** to submit your complaint or **No** to make changes."
+            "Please review the details above.\n"
+            "If everything is correct, say **'Submit Complaint'** to generate your official ticket.\n"
+            "If you need to change anything, simply tell me what to update (e.g., 'Change the amount to 5000')."
         )
         session["conversation_history"].append(f"Assistant: {bot_response}")
         return {
@@ -482,20 +669,31 @@ class DialogueManager:
         session["complaint_id"] = complaint_id
 
         complaint_json = complaint_builder.build_complaint(session, complaint_id)
+
+        # Compute severity
+        filled_slots = session.get("filled_slots", {})
         severity_score = complaint_builder.compute_severity(
-            session.get("filled_slots", {}),
+            filled_slots,
             session.get("category_id")
         )
         complaint_json["severity_score"] = severity_score
+        
+        # Add metadata for Officer Dashboard
+        complaint_json["complaint_id"] = complaint_id
+        complaint_json["ncrp_number"] = complaint_id
         complaint_json["status"] = "pending"
         complaint_json["fir_number"] = None
-
-        # Location routing (uses inline helper, no circular import)
-        user_location = session.get("filled_slots", {}).get("incident_location", "")
-        station = _route_to_station(user_location)
+        phone = session.get("phone_number", "unknown")
+        complaint_json["phone_number"] = phone
+        
+        # Location routing
+        user_location = filled_slots.get("location") or filled_slots.get("city") or filled_slots.get("state") or "Unknown"
+        station = route_to_station(user_location)
+        complaint_json["user_location"] = user_location
         complaint_json["assigned_station"] = station["name"]
         complaint_json["station_jurisdiction"] = station["jurisdiction"]
 
+        # Store in shared complaint store
         complaint_store.save(complaint_id, complaint_json)
 
         try:
@@ -509,6 +707,10 @@ class DialogueManager:
         except Exception:
             pass
 
+        edu_summary = llm_handler.generate_educational_summary(session.get("category_id", ""))
+        
+        station_name = station["name"] if "name" in station else str(station)
+        
         victim_email = session.get("filled_slots", {}).get("victim_email", "")
         victim_name = session.get("filled_slots", {}).get("victim_name", "the complainant")
         category_label = self._get_category_label(session.get("category_id"))
@@ -534,11 +736,16 @@ class DialogueManager:
         }
 
         bot_response = (
-            f"✅ **Complaint submitted successfully!**\n\n"
-            f"**Complaint ID: {complaint_id}**\n\n"
+            f"✅ **Your complaint has been successfully submitted.**\n\n"
+            f"🎫 **Tracking ID**: `{complaint_id}`\n"
+            f"📍 **Routed To**: {station_name} Cyber Cell\n"
+            f"🚨 **Severity Rating**: {severity_score}\n"
+            f"⏳ **Status**: Received — Under Review\n\n"
             f"An acknowledgement has been sent to **{victim_email}**. "
             f"You can track your complaint at `/track/{complaint_id}`.\n\n"
-            f"Authorities at **{station['name']}** will review your complaint. "
+            f"**Next Steps:**\n"
+            f"You do not need to create an account. Simply enter your Tracking ID (`{complaint_id}`) on our homepage to check the status of your complaint at any time.\n"
+            f"{edu_summary}"
             f"National Cybercrime Helpline: **1930**"
         )
         session["conversation_history"].append(f"Assistant: {bot_response}")
