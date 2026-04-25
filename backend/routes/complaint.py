@@ -1,13 +1,15 @@
 """Complaint routes for submission and retrieval."""
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, BackgroundTasks
 from typing import Dict, Any
 import uuid
+import asyncio
 
 from utils.session_store import session_store
 from core.complaint_builder import complaint_builder
 from core.duplicate_checker import duplicate_checker
 from core.complaint_store import complaint_store   # shared store
 from utils.email_sender import send_email
+from routes.upload import get_evidence_by_session
 
 router = APIRouter()
 
@@ -15,7 +17,9 @@ router = APIRouter()
 
 
 @router.post("/complaint/submit")
-async def submit_complaint(request: Dict[str, Any] = Body(...)):
+async def submit_complaint(request: Dict[str, Any] = Body(...), background_tasks: BackgroundTasks = None):
+
+
     """Submit a completed complaint via the REST API.
 
     Args:
@@ -51,19 +55,35 @@ async def submit_complaint(request: Dict[str, Any] = Body(...)):
 
     complaint_id = _generate_complaint_id()
     complaint_json = complaint_builder.build_complaint(session, complaint_id)
+    
+    # Link any evidence uploaded during this session
+    evidence_meta = get_evidence_by_session(session_id)
+    if evidence_meta:
+        complaint_json["evidence_files"] = [
+            {k: v for k, v in m.items() if k != "disk_name"}
+            for m in evidence_meta
+        ]
+        
     severity_score = complaint_builder.compute_severity(filled_slots, category_id)
 
     raw_description = session.get("raw_description", "")
-    dup_result = duplicate_checker.check(phone_number, filled_slots, raw_description)
+    
+    # Run duplicate check in thread to avoid blocking the event loop
+    try:
+        dup_result = await asyncio.to_thread(duplicate_checker.check, phone_number, filled_slots, raw_description)
+    except Exception as e:
+        print(f"Duplicate check failed: {e}")
+        dup_result = {"is_duplicate": False}
 
     duplicate_warning = None
-    if dup_result["is_duplicate"]:
+    if dup_result.get("is_duplicate"):
         duplicate_warning = (
             f"Potential duplicate of complaint {dup_result['matched_complaint_id']} "
             f"detected via {dup_result['method']} match"
         )
 
-    duplicate_checker.register(phone_number, complaint_id, filled_slots, raw_description)
+    # Register in background to speed up response
+    background_tasks.add_task(duplicate_checker.register, phone_number, complaint_id, filled_slots, raw_description)
 
     complaint_json["complaint_id"] = complaint_id
     complaint_json["ncrp_number"] = complaint_id
@@ -114,9 +134,9 @@ async def submit_complaint(request: Dict[str, Any] = Body(...)):
         )
     }
 
-    # Dispatch real email if provided
+    # Dispatch email in background
     if email:
-        send_email(email_preview["to"], email_preview["subject"], email_preview["body"])
+        background_tasks.add_task(send_email, email_preview["to"], email_preview["subject"], email_preview["body"])
 
     result = {
         "complaint_id": complaint_id,

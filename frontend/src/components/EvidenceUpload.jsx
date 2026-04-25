@@ -32,7 +32,7 @@ function EvidenceUpload({ onUpload }) {
     }
   }, []);
 
-  const validateAndUpload = useCallback((file) => {
+  const validateAndUpload = useCallback(async (file) => {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
@@ -50,17 +50,19 @@ function EvidenceUpload({ onUpload }) {
 
     // Upload
     setUploadStatus({ loading: true });
-    onUpload(file);
-
-    // Simulate upload delay
-    setTimeout(() => {
+    
+    try {
+      await onUpload(file);
       setUploadedFile(file);
       setUploadStatus({ success: true });
       setTimeout(() => {
         setUploadStatus(null);
         setUploadedFile(null);
-      }, 3000);
-    }, 1000);
+      }, 4000);
+    } catch (err) {
+      setUploadStatus({ error: 'Upload failed. Please try again.' });
+      setTimeout(() => setUploadStatus(null), 4000);
+    }
   }, [onUpload]);
 
   return (

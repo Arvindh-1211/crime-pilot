@@ -28,52 +28,24 @@
   }
 }
 
-/* Custom scrollbar styles */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
 }
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full hover:bg-gray-300 transition-colors;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+body {
+  @apply bg-[#f0f4f8];
+  background-image: radial-gradient(#e2e8f0 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
 }
 
-/* Fade animation for new messages */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
-}
-
-/* Typing indicator animation */
-@keyframes bounce {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-}
-
-.animate-bounce {
-  animation: bounce 1s infinite;
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -212,6 +184,21 @@
   box-shadow: 0 10px 15px -3px rgba(30, 58, 138, 0.4);
 }
 .login-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+.login-spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 
 .login-footer {
   margin-top: 2rem;

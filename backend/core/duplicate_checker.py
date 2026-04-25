@@ -4,14 +4,7 @@ import os
 from typing import Dict, Any, List, Optional
 import numpy as np
 
-try:
-    from sentence_transformers import SentenceTransformer
-    from sklearn.metrics.pairwise import cosine_similarity
-except ImportError:
-    SentenceTransformer = None
-    cosine_similarity = None
-
-
+# Imports deferred to initialize() to prevent blocking server startup
 class DuplicateChecker:
     """Checks for duplicate complaints using SHA-256 hash and semantic similarity."""
 
@@ -23,11 +16,15 @@ class DuplicateChecker:
 
     def initialize(self):
         """Initialize the embedding model."""
-        if SentenceTransformer is None:
-            raise RuntimeError("sentence-transformers package is not installed")
-
         if self._model is not None:
             return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+            global cosine_similarity
+            from sklearn.metrics.pairwise import cosine_similarity
+        except ImportError:
+            raise RuntimeError("sentence-transformers package is not installed")
 
         try:
             self._model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")

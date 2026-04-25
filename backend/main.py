@@ -1,39 +1,31 @@
 """Main FastAPI application for NCRP Cybercrime Assistant."""
+print('main.py: imported os', flush=True)
 import os
+print('main.py: imported load_dotenv', flush=True)
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv(".env.local")
 load_dotenv()
+print('main.py: loaded dotenv', flush=True)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+print('main.py: importing routes', flush=True)
 from routes import chat, complaint, upload, officer
+print('main.py: imported routes', flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks."""
-    # Startup: Initialize intent classifier
-    from core.intent_classifier import intent_classifier
-
-    try:
-        intent_classifier.initialize()
-        print("Intent classifier initialized successfully")
-    except Exception as e:
-        print(f"Warning: Failed to initialize intent classifier: {e}")
-
-    # Startup: Initialize duplicate checker
-    from core.duplicate_checker import duplicate_checker
-
-    try:
-        duplicate_checker.initialize()
-        print("Duplicate checker initialized successfully")
-    except Exception as e:
-        print(f"Warning: Failed to initialize duplicate checker: {e}")
-
+    # We've moved heavy initializations to be lazy-loaded or 
+    # triggered only when the first chat starts to prevent 
+    # blocking the Officer Portal login.
+    print("NCRP Server started. AI models will be initialized on first use.")
     yield
+
 
     # Shutdown (if needed for cleanup)
     print("Shutting down application")
@@ -50,11 +42,17 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173","http://127.0.0.0:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000","http://127.0.0.0:3000"
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.get("/")

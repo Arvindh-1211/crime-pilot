@@ -17,6 +17,10 @@ os.makedirs(EVIDENCE_DIR, exist_ok=True)
 # In-memory index: file_id → metadata
 _evidence_index: Dict[str, Dict[str, Any]] = {}
 
+def get_evidence_by_session(session_id: str):
+    """Retrieve all evidence metadata for a specific session."""
+    return [m for m in _evidence_index.values() if m.get("session_id") == session_id]
+
 
 @router.post("/upload/evidence")
 async def upload_evidence(

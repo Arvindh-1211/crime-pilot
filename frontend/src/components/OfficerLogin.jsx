@@ -14,15 +14,22 @@ function OfficerLogin({ onLoginSuccess }) {
     setLoading(true);
 
     try {
+      console.log('Starting officer login for:', username);
       const data = await officerLogin(username, password);
+      console.log('Login successful, receiving data:', data);
+      
       // Store officer info
       sessionStorage.setItem('officer_token', data.token);
       sessionStorage.setItem('officer_name', data.name);
       sessionStorage.setItem('officer_badge', data.badge);
       sessionStorage.setItem('officer_station', data.station);
+      
+      console.log('Calling onLoginSuccess...');
       onLoginSuccess(data);
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.response?.data?.detail || 'Invalid credentials. Please try again.');
+
     } finally {
       setLoading(false);
     }

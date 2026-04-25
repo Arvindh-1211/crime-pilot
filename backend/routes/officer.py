@@ -26,10 +26,19 @@ async def officer_login(request: Dict[str, str] = Body(...)):
     """
     username = request.get("username", "").strip().lower()
     password = request.get("password", "")
+    print(f"Login attempt for user: {username}")
 
     officer = OFFICER_DB.get(username)
-    if not officer or not verify_password(password, officer["password_hash"]):
+    if not officer:
+        print(f"Login failed: User {username} not found")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not verify_password(password, officer["password_hash"]):
+        print(f"Login failed: Incorrect password for {username}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    print(f"Login successful for user: {username}")
+
 
     token = create_token(username, officer)
     return {

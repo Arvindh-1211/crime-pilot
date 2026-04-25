@@ -2,11 +2,13 @@ import axios from 'axios';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: 'http://127.0.0.1:8000/api/v1',
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
   }
 });
+
 
 /**
  * Start a new chat session
@@ -111,9 +113,11 @@ export const listComplaints = async () => {
 const getOfficerToken = () => sessionStorage.getItem('officer_token');
 
 const officerApi = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: 'http://127.0.0.1:8000/api/v1',
+  timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
+
 
 officerApi.interceptors.request.use((config) => {
   const token = getOfficerToken();

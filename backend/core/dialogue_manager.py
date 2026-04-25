@@ -150,6 +150,7 @@ class DialogueManager:
         """Get or create session data."""
         if session_id not in self._sessions:
             self._sessions[session_id] = {
+                "session_id": session_id,
                 "state": DialogueState.GREETING,
                 "category_id": None,
                 "category_confidence": 0,
@@ -222,12 +223,17 @@ class DialogueManager:
 
         accumulated = session["raw_description"]
 
+        # Track how many turns we spend in this state to prevent infinite loops
+        desc_turns = session.get("desc_turns", 0)
+        session["desc_turns"] = desc_turns + 1
+
         assessment = llm_handler.assess_description(
             accumulated,
             session.get("conversation_history", [])
         )
 
-        if not assessment.get("sufficient", False):
+        # Force proceed if the user has tried 3 times or it's already sufficient
+        if not assessment.get("sufficient", False) and session["desc_turns"] < 3:
             bot_response = assessment.get(
                 "follow_up",
                 "Could you tell me more about what happened? What exactly did the scammer do or ask you to do?"
@@ -670,6 +676,16 @@ class DialogueManager:
 
         complaint_json = complaint_builder.build_complaint(session, complaint_id)
 
+        # Link any evidence uploaded during this session
+        from routes.upload import get_evidence_by_session
+        session_id = session.get("session_id", "")
+        evidence_meta = get_evidence_by_session(session_id)
+        if evidence_meta:
+            complaint_json["evidence_files"] = [
+                {k: v for k, v in m.items() if k != "disk_name"}
+                for m in evidence_meta
+            ]
+
         # Compute severity
         filled_slots = session.get("filled_slots", {})
         severity_score = complaint_builder.compute_severity(
@@ -677,6 +693,7 @@ class DialogueManager:
             session.get("category_id")
         )
         complaint_json["severity_score"] = severity_score
+
         
         # Add metadata for Officer Dashboard
         complaint_json["complaint_id"] = complaint_id

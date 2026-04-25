@@ -167,12 +167,11 @@ class LLMHandler:
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.1-flash-lite-preview"
         self._genai_client = None
         self._initialized = False
         self.taxonomy: Dict[str, Any] = {}
         self._load_taxonomy()
-        self._init_llm()
 
     def _load_taxonomy(self):
         """Load the large-scale taxonomy from data file."""
@@ -481,6 +480,7 @@ Return JSON array only."""
 
 Your rules:
 - Respond strictly in English only
+- ALWAYS address the user directly as "you". Never refer to them in the third person (e.g., avoid "the user", "he", "she", "the victim", "the complainant").
 - Be warm, empathetic, and patient — victims are often distressed
 - Keep each message SHORT (2-3 sentences max)
 - Ask ONE question at a time — never bundle multiple questions
@@ -489,7 +489,8 @@ Your rules:
 - If the user has described their incident in detail, extract relevant info and only ask for what is missing
 - When asking for location, ask for city and state
 - When asking for email, explain it is for the complaint acknowledgement
-- NEVER repeat a question that has already been answered earlier in the conversation"""
+- NEVER repeat a question that has already been answered earlier in the conversation
+- Refer to their incident as "your incident" or "what happened to you"."""
 
         user_message = self._build_user_message(context)
 
@@ -554,23 +555,19 @@ Your rules:
         prompt = f"""Given this cybercrime incident description:
 \"\"\"{description}\"\"\"
 
-Extract ONLY the following fields if a SPECIFIC, CONCRETE value is EXPLICITLY stated.
+Extract ONLY the following fields from the user's description.
 
 Rules:
-- Dates: only if actual date/day mentioned (e.g. "24th April", "yesterday", "last Tuesday")
-- Phone numbers: only if digits explicitly written
-- UPI IDs: only if @id format explicitly written
-- URLs: only if starts with http/https
-- Platform/app names: only if specific app named (e.g. "WhatsApp", "Instagram", "Telegram")
-- Amounts: only if number with currency context explicitly stated
-- Location: extract city/state only if explicitly mentioned
-- For ALL other fields: if not stated explicitly, OMIT
+1. ONLY extract if a SPECIFIC, CONCRETE value is EXPLICITLY stated.
+2. If a value is mentioned but not specific (e.g., "some money"), DO NOT extract it.
+3. Preserve the user's perspective. Do NOT convert "I" to "He" or "She". If the user says "my account", use "user's account" or just the value.
+4. Return ONLY a raw JSON object. Example: {{"incident_date": "24-05-2026", "platform_used": "WhatsApp"}}
+5. If nothing can be extracted, return {{}}.
+6. Use "true" or "false" for boolean fields if the user confirms or denies something.
+7. For dates, return in DD-MM-YYYY format if possible.
 
 Fields to extract:
-{slots_json}
-
-Return ONLY a raw JSON object. Example: {{"incident_date": "24-05-2026", "platform_used": "WhatsApp"}}
-If nothing meets strict criteria, return {{}}"""
+{slots_json}"""
 
         try:
             model = self._make_model(

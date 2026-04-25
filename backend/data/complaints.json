@@ -1,0 +1,30 @@
+{
+  "CY-2025-601DC654": {
+    "complaint_id": "CY-2025-601DC654",
+    "ncrp_number": "CY-2025-601DC654",
+    "complaint_category": "JOB_FRAUD",
+    "complaint_category_label": "JOB_FRAUD",
+    "date_filed": "2026-04-25T07:56:52.374249",
+    "status": "pending",
+    "victim_name": "",
+    "victim_phone": "",
+    "victim_email": "",
+    "user_location": "Unknown",
+    "fields": {},
+    "meta": {
+      "source": "chat_assistant",
+      "assistant_version": "2.0.0"
+    },
+    "raw_description": "I was stripped some SMS and after that.I telegram.It has been. Telegram  acct has hacked. I couldnt login my account . I got sms link after when i clicked this happened shaasthi.com this is the llink . job opp",
+    "optional_evidence": {
+      "has_screenshot": false,
+      "has_call_recording": false,
+      "has_payment_proof": false
+    },
+    "severity_score": 3.7,
+    "fir_number": null,
+    "phone_number": "unknown",
+    "assigned_station": "Central Cyber Crime Coordination Centre (I4C)",
+    "station_jurisdiction": "National \u2013 India"
+  }
+}

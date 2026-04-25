@@ -4,14 +4,7 @@ import os
 from typing import Dict, Any, List, Optional
 import numpy as np
 
-try:
-    from sentence_transformers import SentenceTransformer
-    from sklearn.metrics.pairwise import cosine_similarity
-except ImportError:
-    SentenceTransformer = None
-    cosine_similarity = None
-
-
+# Imports deferred to initialize() to prevent blocking server startup
 class IntentClassifier:
     """Classify incoming messages into fraud categories using semantic similarity."""
 
@@ -55,11 +48,15 @@ class IntentClassifier:
 
     def initialize(self):
         """Load and initialize the embedding model. Must be called before classify."""
-        if SentenceTransformer is None:
-            raise RuntimeError("sentence-transformers package is not installed")
-
         if self._initialized:
             return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+            global cosine_similarity
+            from sklearn.metrics.pairwise import cosine_similarity
+        except ImportError:
+            raise RuntimeError("sentence-transformers package is not installed")
 
         try:
             self.model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
