@@ -167,7 +167,7 @@ class LLMHandler:
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = "gemini-3.1-flash"  # Using 3.1 as requested
+        self.model_name = "gemini-2.5-flash"
         self._genai_client = None
         self._initialized = False
         self.taxonomy: Dict[str, Any] = {}
